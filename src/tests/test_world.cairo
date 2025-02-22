@@ -1,3 +1,4 @@
+
 #[cfg(test)]
 mod tests {
     use dojo_cairo_test::WorldStorageTestTrait;
@@ -6,9 +7,24 @@ mod tests {
     use dojo_cairo_test::{
         spawn_test_world, NamespaceDef, TestResource, ContractDefTrait, ContractDef,
     };
+    use core::fmt::{Display, Formatter, Error};
 
     use starkwolf::systems::actions::{actions, IActionsDispatcher, IActionsDispatcherTrait};
     use starkwolf::models::{Player, m_Player, GameState, m_GameState, Role, Phase};
+
+    impl PhaseDisplay of Display<Phase> {
+        fn fmt(self: @Phase, ref f: Formatter) -> Result<(), Error> {
+            let mut str: ByteArray = "Error";
+            match self {
+                Phase::Lobby => {str = "Lobby";},
+                Phase::Night => {str = "Night";},
+                Phase::Day => {str = "Day";},
+                Phase::Ended => {str = "Ended";},
+            }
+            f.buffer.append(@str);
+            Result::Ok(())
+        }
+    }
 
     fn namespace_def() -> NamespaceDef {
         let ndef = NamespaceDef {
@@ -53,7 +69,7 @@ mod tests {
         assert(game.players_alive == 3, 'wrong player count');
         assert(game.werewolves_alive == 1, 'wrong werewolf count');
 
-        print!("{game.phase}");
+        println!("{}", game.phase);
 
         // starknet::testing::set_caller_address(caller);
         // actions_system.kill(1, player2);
