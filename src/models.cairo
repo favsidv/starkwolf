@@ -8,6 +8,11 @@ pub struct Player {
     pub role: Role,
     pub is_alive: bool,
     pub has_voted: bool,
+    pub is_protected: bool,
+    pub is_lover: bool,
+    pub lover_target: Option<ContractAddress>,
+    pub witch_life_potion: bool,
+    pub witch_death_potion: bool,
 }
 
 #[derive(Copy, Drop, Serde, Debug)]
@@ -25,6 +30,11 @@ pub struct GameState {
 pub enum Role {
     Villager,
     Werewolf,
+    Witch,
+    Guard,
+    Seer,
+    Hunter,
+    Cupid,
 }
 
 #[derive(Serde, Copy, Drop, Introspect, PartialEq, Debug)]
@@ -40,6 +50,11 @@ impl RoleIntoFelt252 of Into<Role, felt252> {
         match self {
             Role::Villager => 0,
             Role::Werewolf => 1,
+            Role::Witch => 2,
+            Role::Guard => 3,
+            Role::Seer => 4,
+            Role::Hunter => 5,
+            Role::Cupid => 6,
         }
     }
 }
@@ -66,6 +81,11 @@ mod tests {
             role: Role::Villager,
             is_alive: true,
             has_voted: false,
+            is_protected: false,
+            is_lover: false,
+            lover_target: Option::None,
+            witch_life_potion: true,
+            witch_death_potion: true,
         };
         assert(player.is_alive, 'player should be alive');
         assert(!player.has_voted, 'player should not have voted');

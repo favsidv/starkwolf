@@ -1312,8 +1312,8 @@
   },
   "contracts": [
     {
-      "address": "0x368d18d6863b0f59df1c4655c44a15c8e227b35afb3cd28f902239df6d37009",
-      "class_hash": "0x603a53cf750a83f9fa6ce789baef75b01af068e115f2b41881168c74a0f958f",
+      "address": "0x77c621549e26679f2b0c8b5e05e5ee0de9b49673421515da8c610b62e0b1b77",
+      "class_hash": "0xb28e6c5e548cc83a77bc8e46dc8558b3ad91bb10db99d74b1946bae6ee8440",
       "abi": [
         {
           "type": "impl",
@@ -1371,6 +1371,54 @@
           "interface_name": "starkwolf::systems::actions::IActions"
         },
         {
+          "type": "enum",
+          "name": "core::option::Option::<core::starknet::contract_address::ContractAddress>",
+          "variants": [
+            {
+              "name": "Some",
+              "type": "core::starknet::contract_address::ContractAddress"
+            },
+            {
+              "name": "None",
+              "type": "()"
+            }
+          ]
+        },
+        {
+          "type": "enum",
+          "name": "starkwolf::models::Role",
+          "variants": [
+            {
+              "name": "Villager",
+              "type": "()"
+            },
+            {
+              "name": "Werewolf",
+              "type": "()"
+            },
+            {
+              "name": "Witch",
+              "type": "()"
+            },
+            {
+              "name": "Guard",
+              "type": "()"
+            },
+            {
+              "name": "Seer",
+              "type": "()"
+            },
+            {
+              "name": "Hunter",
+              "type": "()"
+            },
+            {
+              "name": "Cupid",
+              "type": "()"
+            }
+          ]
+        },
+        {
           "type": "interface",
           "name": "starkwolf::systems::actions::IActions",
           "items": [
@@ -1416,6 +1464,98 @@
                 },
                 {
                   "name": "target",
+                  "type": "core::starknet::contract_address::ContractAddress"
+                }
+              ],
+              "outputs": [],
+              "state_mutability": "external"
+            },
+            {
+              "type": "function",
+              "name": "witch_action",
+              "inputs": [
+                {
+                  "name": "game_id",
+                  "type": "core::integer::u32"
+                },
+                {
+                  "name": "heal_target",
+                  "type": "core::option::Option::<core::starknet::contract_address::ContractAddress>"
+                },
+                {
+                  "name": "kill_target",
+                  "type": "core::option::Option::<core::starknet::contract_address::ContractAddress>"
+                }
+              ],
+              "outputs": [],
+              "state_mutability": "external"
+            },
+            {
+              "type": "function",
+              "name": "guard_protect",
+              "inputs": [
+                {
+                  "name": "game_id",
+                  "type": "core::integer::u32"
+                },
+                {
+                  "name": "target",
+                  "type": "core::starknet::contract_address::ContractAddress"
+                }
+              ],
+              "outputs": [],
+              "state_mutability": "external"
+            },
+            {
+              "type": "function",
+              "name": "seer_reveal",
+              "inputs": [
+                {
+                  "name": "game_id",
+                  "type": "core::integer::u32"
+                },
+                {
+                  "name": "target",
+                  "type": "core::starknet::contract_address::ContractAddress"
+                }
+              ],
+              "outputs": [
+                {
+                  "type": "starkwolf::models::Role"
+                }
+              ],
+              "state_mutability": "external"
+            },
+            {
+              "type": "function",
+              "name": "hunter_kill",
+              "inputs": [
+                {
+                  "name": "game_id",
+                  "type": "core::integer::u32"
+                },
+                {
+                  "name": "target",
+                  "type": "core::starknet::contract_address::ContractAddress"
+                }
+              ],
+              "outputs": [],
+              "state_mutability": "external"
+            },
+            {
+              "type": "function",
+              "name": "cupid_pair",
+              "inputs": [
+                {
+                  "name": "game_id",
+                  "type": "core::integer::u32"
+                },
+                {
+                  "name": "lover1",
+                  "type": "core::starknet::contract_address::ContractAddress"
+                },
+                {
+                  "name": "lover2",
                   "type": "core::starknet::contract_address::ContractAddress"
                 }
               ],
@@ -1546,6 +1686,11 @@
         "start_game",
         "vote",
         "kill",
+        "witch_action",
+        "guard_protect",
+        "seer_reveal",
+        "hunter_kill",
+        "cupid_pair",
         "upgrade"
       ]
     }
@@ -1560,7 +1705,7 @@
     },
     {
       "members": [],
-      "class_hash": "0x3e63db0fa2a6ba6945983aab43aed5ef6cfb5b861f06a06eaa7f8a1e3addff4",
+      "class_hash": "0x6e89e69d785ef7032ce7322c9fc2f5d9ed8d385d6da5834a5bf7a8e7818f934",
       "tag": "starkwolf-Player",
       "selector": "0x3bac779de26252758a9b91462346d2e941ea8e94dffd81d1fb3da044618b7b0"
     }
@@ -1571,6 +1716,12 @@
       "class_hash": "0x5c82544960387f6e58fa0df6c1edd11f1ad3762832bca297e01a928eda4cf72",
       "tag": "starkwolf-GameStarted",
       "selector": "0x7837c505754c2c5738ec6f7dbc17487b15789c5efca2bdd18bd4060b825c864"
+    },
+    {
+      "members": [],
+      "class_hash": "0x59f09a229cc8886d98ec2e9a30728abed78677eea8f021e92d1dcf7d7f88811",
+      "tag": "starkwolf-LoversPaired",
+      "selector": "0x3807b2435fa268131bc0272b2e68696bed70ad4c78638d4e4b0b8587967c9ce"
     },
     {
       "members": [],

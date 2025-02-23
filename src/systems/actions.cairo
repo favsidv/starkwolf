@@ -1,18 +1,22 @@
-use starknet::{ContractAddress, get_caller_address};
 use starkwolf::models::{Player, Role, Phase, GameState};
+use starknet::{ContractAddress};
 
 #[starknet::interface]
 pub trait IActions<T> {
     fn start_game(ref self: T, game_id: u32, players: Array<ContractAddress>);
     fn vote(ref self: T, game_id: u32, target: ContractAddress);
     fn kill(ref self: T, game_id: u32, target: ContractAddress);
+    // fn witch_action(ref self: T, game_id: u32, heal_target: Option<ContractAddress>, kill_target: Option<ContractAddress>);
+    // fn guard_protect(ref self: T, game_id: u32, target: ContractAddress);
+    // fn seer_reveal(ref self: T, game_id: u32, target: ContractAddress) -> Role;
+    // fn hunter_kill(ref self: T, game_id: u32, target: ContractAddress);
+    fn cupid_pair(ref self: T, game_id: u32, lover1: ContractAddress, lover2: ContractAddress);
 }
 
 #[dojo::contract]
 pub mod actions {
     use super::{IActions, Player, Role, Phase, GameState};
     use starknet::{ContractAddress, get_caller_address};
-
     use dojo::model::{ModelStorage};
     use dojo::event::EventStorage;
 
@@ -32,16 +36,24 @@ pub mod actions {
         pub player_count: u8,
     }
 
+    #[derive(Copy, Drop, Serde)]
+    #[dojo::event]
+    pub struct LoversPaired {
+        #[key]
+        pub game_id: u32,
+        pub lover1: ContractAddress,
+        pub lover2: ContractAddress,
+    }
+
     #[abi(embed_v0)]
     impl ActionsImpl of IActions<ContractState> {
         fn start_game(ref self: ContractState, game_id: u32, players: Array<ContractAddress>) {
             let mut world = self.world_default();
-
             let game: GameState = world.read_model(game_id);
             assert(game.phase == Phase::Lobby, 'game already started');
 
             let player_count = players.len();
-            assert(player_count >= 3, 'not enough players');
+            assert(player_count >= 6, 'need at least 6 players');
 
             let mut i = 0;
             let mut werewolves = 0;
@@ -50,7 +62,15 @@ pub mod actions {
                     break;
                 }
                 let player_addr = *players[i];
-                let role = if i == 0 { Role::Werewolf } else { Role::Villager };
+                let role = match i {
+                    0 => Role::Werewolf,
+                    1 => Role::Witch,
+                    2 => Role::Guard,
+                    3 => Role::Seer,
+                    4 => Role::Hunter,
+                    5 => Role::Cupid,
+                    _ => Role::Villager,
+                };
                 if role == Role::Werewolf {
                     werewolves += 1;
                 }
@@ -59,6 +79,11 @@ pub mod actions {
                     role,
                     is_alive: true,
                     has_voted: false,
+                    is_protected: false,
+                    is_lover: false,
+                    lover_target: Option::None,
+                    witch_life_potion: if role == Role::Witch { true } else { false },
+                    witch_death_potion: if role == Role::Witch { true } else { false },
                 };
                 world.write_model(@player);
                 i += 1;
@@ -94,6 +119,16 @@ pub mod actions {
             world.write_model(@target_player);
             world.write_model(@voter);
 
+            if target_player.is_lover {
+                if let Option::Some(lover_addr) = target_player.lover_target {
+                    let mut lover: Player = world.read_model(lover_addr);
+                    if lover.is_alive {
+                        lover.is_alive = false;
+                        world.write_model(@lover);
+                    }
+                }
+            }
+
             let mut new_game = game;
             new_game.players_alive -= 1;
             if target_player.role == Role::Werewolf {
@@ -121,9 +156,20 @@ pub mod actions {
             assert(killer.role == Role::Werewolf, 'not a werewolf');
             assert(killer.is_alive, 'killer is dead');
             assert(target_player.is_alive, 'target is dead');
+            assert(!target_player.is_protected, 'target is protected');
 
             target_player.is_alive = false;
             world.write_model(@target_player);
+
+            if target_player.is_lover {
+                if let Option::Some(lover_addr) = target_player.lover_target {
+                    let mut lover: Player = world.read_model(lover_addr);
+                    if lover.is_alive {
+                        lover.is_alive = false;
+                        world.write_model(@lover);
+                    }
+                }
+            }
 
             let mut new_game = game;
             new_game.players_alive -= 1;
@@ -132,6 +178,118 @@ pub mod actions {
             world.write_model(@new_game);
 
             world.emit_event(@PlayerEliminated { game_id, player: target });
+        }
+
+        // fn witch_action(ref self: ContractState, game_id: u32, heal_target: Option<ContractAddress>, kill_target: Option<ContractAddress>) {
+        //     let mut world = self.world_default();
+        //     let caller = get_caller_address();
+
+        //     let game: GameState = world.read_model(game_id);
+        //     assert(game.phase == Phase::Night, 'not night phase');
+
+        //     let mut witch: Player = world.read_model(caller);
+        //     assert(witch.role == Role::Witch, 'not a witch');
+        //     assert(witch.is_alive, 'witch is dead');
+
+        //     if let Option::Some(target_addr) = heal_target {
+        //         if witch.witch_life_potion {
+        //             let mut target: Player = world.read_model(target_addr);
+        //             if !target.is_alive {
+        //                 target.is_alive = true;
+        //                 witch.witch_life_potion = false;
+        //                 world.write_model(@target);
+        //                 world.write_model(@witch);
+        //             }
+        //         }
+        //     }
+
+        //     if let Option::Some(target_addr) = kill_target {
+        //         if witch.witch_death_potion {
+        //             let mut target: Player = world.read_model(target_addr);
+        //             if target.is_alive {
+        //                 target.is_alive = false;
+        //                 witch.witch_death_potion = false;
+        //                 world.write_model(@target);
+        //                 world.write_model(@witch);
+        //                 world.emit_event(@PlayerEliminated { game_id, player: target_addr });
+        //             }
+        //         }
+        //     }
+        // }
+
+        // fn guard_protect(ref self: ContractState, game_id: u32, target: ContractAddress) {
+        //     let mut world = self.world_default();
+        //     let caller = get_caller_address();
+
+        //     let game: GameState = world.read_model(game_id);
+        //     assert(game.phase == Phase::Night, 'not night phase');
+
+        //     let guard: Player = world.read_model(caller);
+        //     assert(guard.role == Role::Guard, 'not a guard');
+        //     assert(guard.is_alive, 'guard is dead');
+
+        //     let mut target_player: Player = world.read_model(target);
+        //     assert(target_player.is_alive, 'target is dead');
+        //     target_player.is_protected = true;
+        //     world.write_model(@target_player);
+        // }
+
+        // fn seer_reveal(ref self: ContractState, game_id: u32, target: ContractAddress) -> Role {
+        //     let mut world = self.world_default();
+        //     let caller = get_caller_address();
+
+        //     let game: GameState = world.read_model(game_id);
+        //     assert(game.phase == Phase::Night, 'not night phase');
+
+        //     let seer: Player = world.read_model(caller);
+        //     assert(seer.role == Role::Seer, 'not a seer');
+        //     assert(seer.is_alive, 'seer is dead');
+
+        //     let target_player: Player = world.read_model(target);
+        //     assert(target_player.is_alive, 'target is dead');
+        //     target_player.role
+        // }
+
+        fn hunter_kill(ref self: ContractState, game_id: u32, target: ContractAddress) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+
+            let mut hunter: Player = world.read_model(caller);
+            assert(hunter.role == Role::Hunter, 'not a hunter');
+            assert(!hunter.is_alive, 'hunter must be dead');
+
+            let mut target_player: Player = world.read_model(target);
+            assert(target_player.is_alive, 'target is dead');
+
+            target_player.is_alive = false;
+            world.write_model(@target_player);
+            world.emit_event(@PlayerEliminated { game_id, player: target });
+        }
+
+        fn cupid_pair(ref self: ContractState, game_id: u32, lover1: ContractAddress, lover2: ContractAddress) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+
+            let game: GameState = world.read_model(game_id);
+            assert(game.phase == Phase::Night, 'not night phase');
+
+            let cupid: Player = world.read_model(caller);
+            assert(cupid.role == Role::Cupid, 'not cupid');
+            assert(cupid.is_alive, 'cupid is dead');
+
+            let mut player1: Player = world.read_model(lover1);
+            let mut player2: Player = world.read_model(lover2);
+            assert(player1.is_alive && player2.is_alive, 'lovers must be alive');
+            assert(!player1.is_lover && !player2.is_lover, 'already lovers');
+
+            player1.is_lover = true;
+            player1.lover_target = Option::Some(lover2);
+            player2.is_lover = true;
+            player2.lover_target = Option::Some(lover1);
+
+            world.write_model(@player1);
+            world.write_model(@player2);
+            world.emit_event(@LoversPaired { game_id, lover1, lover2 });
         }
     }
 
