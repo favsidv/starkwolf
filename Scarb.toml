@@ -11,7 +11,6 @@ sierra-replace-ids = true
 migrate = "sozo build && sozo migrate"                          # scarb run migrate
 # start_game = "sozo execute starkwolf-actions start_game --wait" # scarb run start_game
 # vote = "sozo execute starkwolf-actions vote -c 0x0 --wait"      # scarb run vote (exemple avec adresse 0x0)
-# kill = "sozo execute starkwolf-actions kill -c 0x0 --wait"      # scarb run kill (exemple avec adresse 0x0)
 
 [dependencies]
 dojo = { git = "https://github.com/dojoengine/dojo", tag = "v1.2.1" }
