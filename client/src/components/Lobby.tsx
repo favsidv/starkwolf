@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Moon, Users, Plus, ArrowRight, X, Clock, Check, Wallet, Play, ChevronDown } from 'lucide-react';
+import { Users, Plus, ArrowRight, X, Clock, Check, Wallet, Play } from 'lucide-react';
 import defaultAvatar from '../assets/default-avatar.png';
+import logo from '../assets/logo.webp';
 import { connect, disconnect } from "starknetkit";
 import { StarknetWindowObject } from "get-starknet-core";
 
@@ -25,7 +26,7 @@ interface Player {
   isReady: boolean;
 }
 
-// Header Component with Wallet Connection
+// Header Component with Wallet Connection and Logo
 const Header = () => {
   const [connection, setConnection] = useState<StarknetWindowObject>();
   const [address, setAddress] = useState<string>();
@@ -76,8 +77,11 @@ const Header = () => {
       <div className="container mx-auto max-w-7xl py-6 px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Moon className="text-amber-400" size={48} />
-            <h1 className="text-6xl font-serif text-amber-400 tracking-wide">StarkWolf</h1>
+            <img 
+              src={logo} 
+              alt="StarkWolf Logo" 
+              className="h-12 w-auto object-contain" 
+            />
           </div>
           <button
             onClick={address ? disconnectWallet : connectWallet}
@@ -91,48 +95,6 @@ const Header = () => {
     </div>
   );
 };
-
-// Hero Section Component with Scroll Chevron
-const HeroSection = ({ onPlayClick }: { onPlayClick: () => void }) => (
-  <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
-    <div className="absolute inset-0 bg-[url('/dark-forest.jpg')] bg-cover bg-center" />
-    <div className="absolute inset-0 bg-gradient-to-b from-gray-950/90 via-gray-950/70 to-gray-950/95" />
-    <div className="absolute inset-0">
-      <div className="h-full w-full bg-[url('/fog-overlay.png')] bg-repeat-x animate-fog opacity-20" />
-    </div>
-    <div className="relative z-10 container mx-auto px-4 py-32 text-center">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-        className="max-w-3xl mx-auto space-y-8"
-      >
-        <h2 className="text-7xl font-serif text-amber-400 mb-6 drop-shadow-[0_0_15px_rgba(251,191,36,0.3)]">
-          Welcome to StarkWolf
-        </h2>
-        <p className="text-xl text-gray-200 mb-8 leading-relaxed font-medium">
-          In a cursed village shrouded in mist, roles are cast and loyalties tested. Will you uncover the wolves, or weave your own web of deception?
-        </p>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={onPlayClick}
-          className="inline-flex items-center gap-3 bg-gradient-to-r from-amber-600 to-amber-400 text-gray-900 px-8 py-4 rounded-lg text-xl font-semibold shadow-lg shadow-amber-800/50 hover:shadow-amber-800/70 transition-all"
-        >
-          <Play className="w-6 h-6" />
-          Join the Hunt
-        </motion.button>
-      </motion.div>
-      <motion.div
-        animate={{ y: [0, 10, 0] }}
-        transition={{ duration: 1.5, repeat: Infinity }}
-        className="absolute bottom-10 left-1/2 transform -translate-x-1/2"
-      >
-        <ChevronDown size={36} className="text-amber-400" />
-      </motion.div>
-    </div>
-  </div>
-);
 
 // GameCard Component
 const GameCard = ({ title, players, maxPlayers, onClick }: { title: string; players: number; maxPlayers: number; onClick: () => void }) => (
@@ -312,51 +274,78 @@ export default function Lobby({ onJoinGame }: LobbyProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 font-[Crimson Text]">
-      <Header />
-      <HeroSection onPlayClick={() => document.getElementById('game-section')?.scrollIntoView({ behavior: 'smooth' })} />
-      
-      <div id="game-section" className="relative bg-gradient-to-b from-gray-950 via-gray-950 to-gray-950 min-h-screen">
-        <div className="absolute inset-0">
-          <div className="h-full w-full bg-[url('/fog-overlay.png')] bg-repeat-x animate-fog opacity-10" />
-        </div>
-        <div className="container mx-auto max-w-6xl py-24 px-4 relative z-10">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black font-[Crimson Text] overflow-x-hidden">
+      {/* Immersive Background */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-[url('/dark-forest.jpg')] bg-cover bg-center opacity-70 animate-subtle-zoom" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80" />
+        <div className="absolute inset-0 animate-fog" style={{ background: 'url(/fog-overlay.png) repeat-x', backgroundSize: '200% 100%' }} />
+        <div className="absolute inset-0 animate-moonlight" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(251, 191, 36, 0.1) 0%, transparent 50%)' }} />
+      </div>
+
+      {/* Content Wrapper */}
+      <div className="relative z-10">
+        <Header />
+
+        {/* Main Lobby Section */}
+        <div className="container mx-auto max-w-6xl py-24 px-4 min-h-screen flex flex-col justify-center">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 0.5 }}
+            className="text-center mb-16"
+          >
+            <h1 className="text-8xl font-serif text-amber-400 tracking-tight drop-shadow-[0_0_20px_rgba(251,191,36,0.5)] animate-pulse-slow">
+              Enter the Hunt
+            </h1>
+            <p className="text-2xl text-gray-200 mt-4 font-medium animate-fade-in">
+              The moon rises. Will you survive the night or become the predator?
+            </p>
+          </motion.div>
+
           <div className="grid lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
-            <div className="space-y-8">
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.8 }}
+              className="space-y-8"
+            >
               <div>
-                <h2 className="text-3xl font-serif font-bold mb-6 text-amber-300">Join the Hunt</h2>
+                <h2 className="text-4xl font-serif font-bold mb-6 text-amber-300 drop-shadow-md">Join a Game</h2>
                 <div className="flex gap-3">
                   <input
                     type="text"
                     placeholder="Enter game code"
                     value={joinGameCode}
                     onChange={(e) => setJoinGameCode(e.target.value)}
-                    className="flex-1 bg-gray-900/50 rounded-lg px-4 py-3 text-lg text-gray-200 placeholder-gray-400 border border-amber-800/30 focus:border-amber-600 focus:outline-none transition-colors"
+                    className="flex-1 bg-gray-900/60 rounded-lg px-4 py-3 text-lg text-gray-200 placeholder-gray-500 border border-amber-800/40 focus:border-amber-600 focus:outline-none transition-all duration-300 backdrop-blur-sm"
                   />
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => joinGameCode && onJoinGame(joinGameCode)}
-                    className="bg-amber-800/20 hover:bg-amber-800/30 px-6 rounded-lg flex items-center text-amber-300 border border-amber-800/30 transition-colors"
+                    className="bg-amber-800/30 hover:bg-amber-800/50 px-6 rounded-lg flex items-center text-amber-300 border border-amber-800/40 transition-all duration-300"
                   >
                     <ArrowRight size={24} />
-                  </button>
+                  </motion.button>
                 </div>
               </div>
               <div>
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setShowCreatePopup(true)}
-                  className="w-full bg-gradient-to-r from-amber-600 to-amber-400 hover:from-amber-500 hover:to-amber-300 text-gray-900 font-bold rounded-lg px-6 py-4 flex items-center justify-center gap-3 transition-all text-lg group shadow-lg shadow-amber-800/30"
+                  className="w-full bg-gradient-to-r from-amber-600 to-amber-400 hover:from-amber-500 hover:to-amber-300 text-gray-900 font-bold rounded-lg px-6 py-4 flex items-center justify-center gap-3 transition-all duration-300 text-lg group shadow-lg shadow-amber-800/40"
                 >
                   <Plus size={24} className="group-hover:rotate-90 transition-transform duration-300" />
                   Create New Game
                 </motion.button>
               </div>
-              
-              <div className="bg-gray-900/30 rounded-lg p-6 border border-amber-800/20 backdrop-blur-sm">
-                <h3 className="text-xl font-serif text-amber-300 mb-4">Rules of the Night</h3>
+              <div className="bg-gray-900/40 rounded-lg p-6 border border-amber-800/30 backdrop-blur-sm">
+                <h3 className="text-2xl font-serif text-amber-300 mb-4 drop-shadow-sm">Rules of the Night</h3>
                 <ul className="space-y-4 text-gray-200">
                   <li className="flex items-start gap-3">
-                    <Moon size={20} className="text-amber-400 shrink-0 mt-1" />
+                    <Users size={20} className="text-amber-400 shrink-0 mt-1" />
                     <p>Night falls, and roles awaken: Werewolves hunt, special roles act, and villagers sleep.</p>
                   </li>
                   <li className="flex items-start gap-3">
@@ -364,7 +353,7 @@ export default function Lobby({ onJoinGame }: LobbyProps) {
                     <p>6-10 players are assigned secret roles with unique abilities.</p>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Moon size={20} className="text-amber-400 shrink-0 mt-1" />
+                    <Users size={20} className="text-amber-400 shrink-0 mt-1" />
                     <p>Daybreak brings debate: accuse, defend, and vote to banish suspected wolves.</p>
                   </li>
                   <li className="flex items-start gap-3">
@@ -373,10 +362,14 @@ export default function Lobby({ onJoinGame }: LobbyProps) {
                   </li>
                 </ul>
               </div>
-            </div>
-            
-            <div>
-              <h2 className="text-3xl font-serif font-bold mb-6 text-amber-300">Active Hunts</h2>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.8 }}
+            >
+              <h2 className="text-4xl font-serif font-bold mb-6 text-amber-300 drop-shadow-md">Active Hunts</h2>
               <div className="space-y-4">
                 {mockGames.map((game) => (
                   <GameCard
@@ -388,42 +381,80 @@ export default function Lobby({ onJoinGame }: LobbyProps) {
                   />
                 ))}
               </div>
-            </div>
+            </motion.div>
           </div>
 
-          <div className="mt-16">
-            <h2 className="text-3xl font-serif font-bold mb-8 text-amber-300 text-center">Roles of the Night</h2>
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 1 }}
+            className="mt-16"
+          >
+            <h2 className="text-4xl font-serif font-bold mb-8 text-amber-300 text-center drop-shadow-md">Roles of the Night</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {roles.map((role) => (
                 <RoleCard key={role.name} image={role.image} name={role.name} description={role.description} />
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
-      </div>
-      
-      <AnimatePresence>
-        {showCreatePopup && (
-          <CreateGamePopup
-            onClose={() => setShowCreatePopup(false)}
-            gameCode={mockGameCode}
-            players={mockPlayers}
-            onStartGame={handleStartGame}
-          />
-        )}
-      </AnimatePresence>
 
+        <AnimatePresence>
+          {showCreatePopup && (
+            <CreateGamePopup
+              onClose={() => setShowCreatePopup(false)}
+              gameCode={mockGameCode}
+              players={mockPlayers}
+              onStartGame={handleStartGame}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Enhanced Styles */}
       <style>{`
+        @keyframes subtle-zoom {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+          100% { transform: scale(1); }
+        }
+        .animate-subtle-zoom {
+          animation: subtle-zoom 20s ease-in-out infinite;
+        }
+
         @keyframes fog-movement {
-          0% {
-            background-position: 0% 0%;
-          }
-          100% {
-            background-position: 100% 0%;
-          }
+          0% { background-position: 0% 0%; }
+          100% { background-position: 100% 0%; }
         }
         .animate-fog {
-          animation: fog-movement 60s linear infinite;
+          animation: fog-movement 30s linear infinite;
+          opacity: 0.4;
+        }
+
+        @keyframes moonlight {
+          0% { opacity: 0.1; transform: translateY(-10%); }
+          50% { opacity: 0.2; transform: translateY(0); }
+          100% { opacity: 0.1; transform: translateY(-10%); }
+        }
+        .animate-moonlight {
+          animation: moonlight 15s ease-in-out infinite;
+        }
+
+        @keyframes pulse-slow {
+          0% { text-shadow: 0 0 20px rgba(251, 191, 36, 0.5); }
+          50% { text-shadow: 0 0 30px rgba(251, 191, 36, 0.7); }
+          100% { text-shadow: 0 0 20px rgba(251, 191, 36, 0.5); }
+        }
+        .animate-pulse-slow {
+          animation: pulse-slow 5s ease-in-out infinite;
+        }
+
+        @keyframes fade-in {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
+        }
+        .animate-fade-in {
+          animation: fade-in 2s ease-in-out forwards;
         }
       `}</style>
     </div>
