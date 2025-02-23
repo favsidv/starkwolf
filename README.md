@@ -14,7 +14,7 @@
 - [ ] Automatic Player Fill Script
 
 ### 🎨 Frontend
-- [ ] Tauri Integration
+- [ ] Torii Integration
 - [ ] GraphQL Setup
 - [ ] Core Frontend Functionalities
 - [ ] Frontend Design Implementation
