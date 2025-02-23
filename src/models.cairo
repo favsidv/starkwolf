@@ -11,7 +11,6 @@ pub struct Player {
     pub is_alive: bool,
     pub has_voted: bool,
     pub is_protected: bool,
-    pub is_lover: bool,
     pub lover_target: Option<ContractAddress>,
     pub witch_life_potion: bool,
     pub witch_death_potion: bool,
@@ -26,6 +25,9 @@ pub struct GameState {
     pub players_alive: u8,
     pub werewolves_alive: u8,
     pub day_count: u8,
+    pub phase_start_timestamp: u64,
+    pub day_duration: u64,
+    pub night_action_duration: u64,
 }
 
 #[derive(Serde, Copy, Drop, Introspect, PartialEq, Debug)]

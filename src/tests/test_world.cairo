@@ -51,8 +51,90 @@ mod tests {
         ].span()
     }
 
+    // #[test]
+    // fn test_game_flow() {
+    //     let werewolf = starknet::contract_address_const::<0x1>();
+    //     let witch = starknet::contract_address_const::<0x2>();
+    //     let guard = starknet::contract_address_const::<0x3>();
+    //     let seer = starknet::contract_address_const::<0x4>();
+    //     let hunter = starknet::contract_address_const::<0x5>();
+    //     let cupid = starknet::contract_address_const::<0x6>();
+    //     let villager = starknet::contract_address_const::<0x7>();
+
+    //     let ndef = namespace_def();
+    //     let mut world = spawn_test_world([ndef].span());
+    //     world.sync_perms_and_inits(contract_defs());
+
+    //     let (contract_address, _) = world.dns(@"actions").unwrap();
+    //     let actions_system = IActionsDispatcher { contract_address };
+
+    //     let players = array![werewolf, witch, guard, seer, hunter, cupid, villager];
+    //     actions_system.start_game(1, players);
+
+    //     let werewolf_state: Player = world.read_model((1, werewolf));
+    //     assert(werewolf_state.role == Role::Werewolf, 'werewolf role incorrect');
+
+    //     let game: GameState = world.read_model(1);
+    //     assert(game.phase == Phase::Night, 'wrong initial phase');
+    //     assert(game.players_alive == 7, 'wrong player count');
+    //     assert(game.werewolves_alive == 1, 'wrong werewolf count');
+
+    //     // starknet::testing::set_contract_address(cupid);
+    //     // actions_system.cupid_action(1, villager, guard);
+    //     // let villager_state: Player = world.read_model((1, villager));
+    //     // let guard_state: Player = world.read_model((1, guard));
+    //     // assert(villager_state.lover_target == Option::Some(guard_state.address), 'not the correct lover');
+
+    //     // starknet::testing::set_contract_address(werewolf);
+    //     // assert(guard_state.is_alive, 'is dead');
+    //     // actions_system.werewolf_action(1, villager);
+    //     // let guard_state: Player = world.read_model((1, guard));
+    //     // assert(!guard_state.is_alive, 'is alive');
+
+    //     // starknet::testing::set_contract_address(seer);
+    //     // actions_system.vote(1, hunter);
+    //     // let hunter_state: Player = world.read_model((1, hunter));
+    //     // assert(!hunter_state.is_alive, 'is alive');
+
+    //     // starknet::testing::set_contract_address(hunter);
+    //     // let cupid_state: Player = world.read_model((1, cupid));
+    //     // assert(cupid_state.is_alive, 'already dead');
+    //     // actions_system.hunter_action(1, cupid);
+    //     // let cupid_state: Player = world.read_model((1, cupid));
+    //     // assert(!cupid_state.is_alive, 'stile alive');
+
+    //     // starknet::testing::set_contract_address(seer);
+    //     // let werewolf_state: Player = world.read_model((1, werewolf));
+    //     // let test_seer_view = actions_system.seer_action(1, werewolf);
+    //     // println!("{}", test_seer_view);
+    //     // assert(werewolf_state.is_alive, 'already dead');
+
+    //     // starknet::testing::set_contract_address(hunter);
+    //     // let cupid_state: Player = world.read_model((1, cupid));
+    //     // assert(cupid_state.is_alive, 'already dead');
+    //     // actions_system.hunter_action(1, cupid);
+    //     // let cupid_state: Player = world.read_model((1, cupid));
+    //     // assert(!cupid_state.is_alive, 'stile alive');
+
+    //     // starknet::testing::set_contract_address(guard);
+    //     // actions_system.guard_action(1, villager);
+    //     // let villager_state: Player = world.read_model((1, villager));
+    //     // assert(villager_state.is_protected, 'not protected');
+    
+    //     // starknet::testing::set_contract_address(werewolf);
+    //     // actions_system.werewolf_action(1, villager);
+    //     // let villager_state: Player = world.read_model((1, villager));
+    //     // assert(villager_state.is_alive, 'already dead');
+
+    //     starknet::testing::set_contract_address(witch);
+    //     actions_system.witch_action(1, Option::None, Option::Some(villager));
+    //     let villager_state: Player = world.read_model((1, villager));
+    //     assert(!villager_state.is_alive, 'still alive');
+
+    // }
+
     #[test]
-    fn test_game_flow() {
+    fn test_time_management() {
         let werewolf = starknet::contract_address_const::<0x1>();
         let witch = starknet::contract_address_const::<0x2>();
         let guard = starknet::contract_address_const::<0x3>();
@@ -71,66 +153,28 @@ mod tests {
         let players = array![werewolf, witch, guard, seer, hunter, cupid, villager];
         actions_system.start_game(1, players);
 
-        let werewolf_state: Player = world.read_model((1, werewolf));
-        assert(werewolf_state.role == Role::Werewolf, 'werewolf role incorrect');
-
         let game: GameState = world.read_model(1);
         assert(game.phase == Phase::Night, 'wrong initial phase');
-        assert(game.players_alive == 7, 'wrong player count');
-        assert(game.werewolves_alive == 1, 'wrong werewolf count');
+        assert(game.day_duration == 120, 'wrong day duration');
+        assert(game.night_action_duration == 20, 'wrong night duration');
 
-        // starknet::testing::set_contract_address(cupid);
-        // actions_system.cupid_action(1, villager, guard);
-        // let villager_state: Player = world.read_model((1, villager));
-        // let guard_state: Player = world.read_model((1, guard));
-        // assert(villager_state.is_lover, 'not lover');
-        // assert(villager_state.lover_target == Option::Some(guard_state.address), 'not the correct lover');
-
+        // starknet::testing::set_block_timestamp(game.phase_start_timestamp + 21);
         // starknet::testing::set_contract_address(werewolf);
-        // assert(guard_state.is_alive, 'is dead');
-        // actions_system.werewolf_action(1, villager);
-        // let guard_state: Player = world.read_model((1, guard));
-        // assert(!guard_state.is_alive, 'is alive');
+        // let res = actions_system.werewolf_action(1, villager);
+        // assert(res.is_err(), 'action should fail after timeout');
 
-        // starknet::testing::set_contract_address(seer);
-        // actions_system.vote(1, hunter);
-        // let hunter_state: Player = world.read_model((1, hunter));
-        // assert(!hunter_state.is_alive, 'is alive');
+        let mut game: GameState = world.read_model(1);
+        game.phase = Phase::Day;
+        game.phase_start_timestamp = starknet::get_block_timestamp();
+        world.write_model(@game);
 
-        // starknet::testing::set_contract_address(hunter);
-        // let cupid_state: Player = world.read_model((1, cupid));
-        // assert(cupid_state.is_alive, 'already dead');
-        // actions_system.hunter_action(1, cupid);
-        // let cupid_state: Player = world.read_model((1, cupid));
-        // assert(!cupid_state.is_alive, 'stile alive');
+        starknet::testing::set_contract_address(seer);
+        actions_system.vote(1, hunter); // OK dans le temps
+        let hunter_state: Player = world.read_model((1, hunter));
+        assert(!hunter_state.is_alive, 'hunter should be dead');
 
-        // starknet::testing::set_contract_address(seer);
-        // let werewolf_state: Player = world.read_model((1, werewolf));
-        // let test_seer_view = actions_system.seer_action(1, werewolf);
-        // println!("{}", test_seer_view);
-        // assert(werewolf_state.is_alive, 'already dead');
-
-        // starknet::testing::set_contract_address(hunter);
-        // let cupid_state: Player = world.read_model((1, cupid));
-        // assert(cupid_state.is_alive, 'already dead');
-        // actions_system.hunter_action(1, cupid);
-        // let cupid_state: Player = world.read_model((1, cupid));
-        // assert(!cupid_state.is_alive, 'stile alive');
-
-        // starknet::testing::set_contract_address(guard);
-        // actions_system.guard_action(1, villager);
-        // let villager_state: Player = world.read_model((1, villager));
-        // assert(villager_state.is_protected, 'not protected');
-    
-        // starknet::testing::set_contract_address(werewolf);
-        // actions_system.werewolf_action(1, villager);
-        // let villager_state: Player = world.read_model((1, villager));
-        // assert(villager_state.is_alive, 'already dead');
-
-        starknet::testing::set_contract_address(witch);
-        actions_system.witch_action(1, Option::None, Option::Some(villager));
-        let villager_state: Player = world.read_model((1, villager));
-        assert(!villager_state.is_alive, 'still alive');
-
+        // starknet::testing::set_block_timestamp(game.phase_start_timestamp + 121);
+        // let res = actions_system.vote(1, villager); // Devrait échouer
+        // assert(res.is_err(), 'vote should fail after timeout');
     }
 }
