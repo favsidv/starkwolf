@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "framer-motion": "^11.0.5",
+    "get-starknet": "^3.0.1",
+    "starknet": "^5.24.3",
+    "starknetkit": "^1.1.3"
+  }
+}
