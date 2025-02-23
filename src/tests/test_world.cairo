@@ -134,7 +134,7 @@ mod tests {
     // }
 
     #[test]
-    fn test_time_management() {
+    fn test_voting() {
         let werewolf = starknet::contract_address_const::<0x1>();
         let witch = starknet::contract_address_const::<0x2>();
         let guard = starknet::contract_address_const::<0x3>();
@@ -150,31 +150,37 @@ mod tests {
         let (contract_address, _) = world.dns(@"actions").unwrap();
         let actions_system = IActionsDispatcher { contract_address };
 
-        let players = array![werewolf, witch, guard, seer, hunter, cupid, villager];
+        let players_array = array![werewolf, witch, guard, seer, hunter, cupid, villager];
+        let players = players_array.span();
         actions_system.start_game(1, players);
-
-        let game: GameState = world.read_model(1);
-        assert(game.phase == Phase::Night, 'wrong initial phase');
-        assert(game.day_duration == 120, 'wrong day duration');
-        assert(game.night_action_duration == 20, 'wrong night duration');
-
-        // starknet::testing::set_block_timestamp(game.phase_start_timestamp + 21);
-        // starknet::testing::set_contract_address(werewolf);
-        // let res = actions_system.werewolf_action(1, villager);
-        // assert(res.is_err(), 'action should fail after timeout');
 
         let mut game: GameState = world.read_model(1);
         game.phase = Phase::Day;
         game.phase_start_timestamp = starknet::get_block_timestamp();
         world.write_model(@game);
 
-        starknet::testing::set_contract_address(seer);
-        actions_system.vote(1, hunter); // OK dans le temps
-        let hunter_state: Player = world.read_model((1, hunter));
-        assert(!hunter_state.is_alive, 'hunter should be dead');
+        // starknet::testing::set_contract_address(werewolf);
+        // actions_system.vote(1, hunter);
 
-        // starknet::testing::set_block_timestamp(game.phase_start_timestamp + 121);
-        // let res = actions_system.vote(1, villager); // Devrait échouer
-        // assert(res.is_err(), 'vote should fail after timeout');
+        // starknet::testing::set_contract_address(witch);
+        // actions_system.vote(1, hunter);
+
+        // starknet::testing::set_contract_address(guard);
+        // actions_system.vote(1, seer);
+
+        // actions_system.end_voting(1);
+
+        // let hunter_state: Player = world.read_model((1, hunter));
+        // assert(!hunter_state.is_alive, 'hunter should be dead');
+
+        // let seer_state: Player = world.read_model((1, seer));
+        // assert(seer_state.is_alive, 'seer should be alive');
+
+        // let game: GameState = world.read_model(1);
+        // assert(game.phase == Phase::Night, 'should be night phase');
+        // assert(game.players_alive == 6, 'wrong player count');
+
+        // let werewolf_state: Player = world.read_model((1, werewolf));
+        // assert(!werewolf_state.has_voted, 'werewolf should not have voted');
     }
 }

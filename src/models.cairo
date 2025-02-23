@@ -16,7 +16,7 @@ pub struct Player {
     pub witch_death_potion: bool,
 }
 
-#[derive(Copy, Drop, Serde, Debug)]
+#[derive(Drop, Serde, Debug)]
 #[dojo::model]
 pub struct GameState {
     #[key]
@@ -28,6 +28,17 @@ pub struct GameState {
     pub phase_start_timestamp: u64,
     pub day_duration: u64,
     pub night_action_duration: u64,
+    pub players: Array<ContractAddress>,
+}
+
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct Vote {
+    #[key]
+    pub game_id: u32,
+    #[key]
+    pub voter: ContractAddress,
+    pub target: ContractAddress,
 }
 
 #[derive(Serde, Copy, Drop, Introspect, PartialEq, Debug)]
