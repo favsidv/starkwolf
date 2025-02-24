@@ -12,8 +12,15 @@ pub struct Player {
     pub has_voted: bool,
     pub is_protected: bool,
     pub lover_target: Option<ContractAddress>,
-    pub witch_life_potion: bool,
-    pub witch_death_potion: bool,
+}
+
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct WitchPotions {
+    #[key]
+    pub game_id: u32,
+    pub has_life_potion: bool,
+    pub has_death_potion: bool,
 }
 
 #[derive(Drop, Serde, Debug)]
@@ -84,38 +91,3 @@ impl PhaseIntoFelt252 of Into<Phase, felt252> {
         }
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::{Player, GameState, Role, Phase};
-
-//     #[test]
-//     fn test_initial_player() {
-//         let player = Player {
-//             game_id: 1,
-//             address: starknet::contract_address_const::<0x0>(),
-//             role: Role::Villager,
-//             is_alive: true,
-//             has_voted: false,
-//             is_protected: false,
-//             is_lover: false,
-//             lover_target: Option::None,
-//             witch_life_potion: true,
-//             witch_death_potion: true,
-//         };
-//         assert(player.is_alive, 'player should be alive');
-//         assert(!player.has_voted, 'player should not have voted');
-//     }
-
-//     #[test]
-//     fn test_initial_game_state() {
-//         let game = GameState {
-//             game_id: 1,
-//             phase: Phase::Lobby,
-//             players_alive: 0,
-//             werewolves_alive: 0,
-//             day_count: 0,
-//         };
-//         assert(game.phase == Phase::Lobby, 'wrong initial phase');
-//     }
-// }
