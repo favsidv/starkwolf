@@ -60,7 +60,8 @@ pub mod actions {
             assert(game.phase == Phase::Lobby, 'E01');
 
             let player_count = players.len();
-            assert(player_count >= 6, 'E02');
+            assert(player_count >= 6, 'E02.1');
+            assert(player_count <= 12, 'E02.2');
 
             let mut i = 0;
             let mut werewolves = 0;

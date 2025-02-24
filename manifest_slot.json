@@ -1313,7 +1313,7 @@
   "contracts": [
     {
       "address": "0x30caf705ec459e733e170c2ca7603642ae1ce52eaa3ac535f503c3a2ec6263e",
-      "class_hash": "0x77f2fdd68e24b9b050f89875594a3d261539784ad6e32f099c4d5f803220fe1",
+      "class_hash": "0x223e81a7280ffc6b807309cb2f00e9c957c4f84016e666723e973482e17ed29",
       "abi": [
         {
           "type": "impl",
@@ -1446,6 +1446,22 @@
                 },
                 {
                   "name": "lover2",
+                  "type": "core::starknet::contract_address::ContractAddress"
+                }
+              ],
+              "outputs": [],
+              "state_mutability": "external"
+            },
+            {
+              "type": "function",
+              "name": "hunter_action",
+              "inputs": [
+                {
+                  "name": "game_id",
+                  "type": "core::integer::u32"
+                },
+                {
+                  "name": "target",
                   "type": "core::starknet::contract_address::ContractAddress"
                 }
               ],
@@ -1589,6 +1605,7 @@
         "vote",
         "night_action",
         "cupid_action",
+        "hunter_action",
         "end_voting",
         "upgrade"
       ]
@@ -1627,6 +1644,12 @@
       "class_hash": "0x5c82544960387f6e58fa0df6c1edd11f1ad3762832bca297e01a928eda4cf72",
       "tag": "starkwolf-GameStarted",
       "selector": "0x7837c505754c2c5738ec6f7dbc17487b15789c5efca2bdd18bd4060b825c864"
+    },
+    {
+      "members": [],
+      "class_hash": "0x44e45d98ba91e98fa594fd7b5647db8c08770d2d566dbb9ac64d92154a8c07f",
+      "tag": "starkwolf-HunterShot",
+      "selector": "0x382067e364ad9f547e5576a6f9fe6d5ba06163ea079d41088a34136462001b0"
     },
     {
       "members": [],
