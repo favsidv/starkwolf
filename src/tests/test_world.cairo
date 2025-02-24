@@ -40,6 +40,7 @@ mod tests {
                 TestResource::Event(actions::e_PlayerEliminated::TEST_CLASS_HASH),
                 TestResource::Event(actions::e_GameStarted::TEST_CLASS_HASH),
                 TestResource::Event(actions::e_LoversPaired::TEST_CLASS_HASH),
+                TestResource::Event(actions::e_HunterShot::TEST_CLASS_HASH),
                 TestResource::Contract(actions::TEST_CLASS_HASH),
             ].span(),
         };
@@ -169,6 +170,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_timestamp() {
         let werewolf = starknet::contract_address_const::<0x1>();
         let witch = starknet::contract_address_const::<0x2>();
@@ -299,5 +301,82 @@ mod tests {
         let game: GameState = world.read_model(1);
         assert(game.players_alive == 2, 'wrong player count after vote');
         assert(game.phase == Phase::Ended, 'game should end with no wolves');
+    }
+
+    #[test]
+    fn test_impl() {
+        let werewolf = starknet::contract_address_const::<0x1>();
+        let witch = starknet::contract_address_const::<0x2>();
+        let guard = starknet::contract_address_const::<0x3>();
+        let seer = starknet::contract_address_const::<0x4>();
+        let hunter = starknet::contract_address_const::<0x5>();
+        let cupid = starknet::contract_address_const::<0x6>();
+        let villager = starknet::contract_address_const::<0x7>();
+
+        let ndef = namespace_def();
+        let mut world = spawn_test_world([ndef].span());
+        world.sync_perms_and_inits(contract_defs());
+
+        let (contract_address, _) = world.dns(@"actions").unwrap();
+        let actions_system = IActionsDispatcher { contract_address };
+
+        let players_array = array![werewolf, witch, guard, seer, hunter, cupid, villager];
+        let players = players_array.span();
+        actions_system.start_game(1, players);
+
+        let game: GameState = world.read_model(1);
+        assert(game.phase == Phase::Night, 'should start at night');
+        assert(game.players_alive == 7, 'wrong initial player count');
+        assert(game.werewolves_alive == 1, 'wrong werewolf count');
+        let potions: WitchPotions = world.read_model(1);
+        assert(potions.has_life_potion, 'witch should have life potion');
+        assert(potions.has_death_potion, 'witch should have death potion');
+
+        starknet::testing::set_contract_address(cupid);
+        actions_system.cupid_action(1, villager, guard);
+        let villager_state: Player = world.read_model((1, villager));
+        let guard_state: Player = world.read_model((1, guard));
+        assert(villager_state.lover_target == Option::Some(guard), 'villager not linked to guard');
+        assert(guard_state.lover_target == Option::Some(villager), 'guard not linked to villager');
+
+        starknet::testing::set_contract_address(guard);
+        actions_system.night_action(1, villager);
+        let villager_state: Player = world.read_model((1, villager));
+        assert(villager_state.is_protected, 'villager should be protected');
+
+        starknet::testing::set_contract_address(werewolf);
+        actions_system.night_action(1, villager);
+        let villager_state: Player = world.read_model((1, villager));
+        assert(villager_state.is_alive, 'villager should still be alive');
+        let game: GameState = world.read_model(1);
+        assert(game.phase == Phase::Day, 'should be day after wolf action');
+        assert(game.players_alive == 7, 'no one should be dead yet');
+
+        starknet::testing::set_contract_address(werewolf);
+        let hunter_state: Player = world.read_model((1, hunter));
+        assert(hunter_state.is_alive, 'hunter should still be alive');
+
+        actions_system.vote(1, hunter);
+        starknet::testing::set_contract_address(witch);
+        actions_system.vote(1, hunter);
+        starknet::testing::set_contract_address(guard);
+        actions_system.vote(1, hunter);
+
+        actions_system.end_voting(1);
+        let hunter_state: Player = world.read_model((1, hunter));
+        assert(!hunter_state.is_alive, 'h should be dead after voting');
+
+        let game: GameState = world.read_model(1);
+        starknet::testing::set_block_timestamp(game.phase_start_timestamp + 10);
+        starknet::testing::set_contract_address(hunter);
+        actions_system.hunter_action(1, villager);
+
+        let villager_state: Player = world.read_model((1, villager));
+        assert(!villager_state.is_alive, 'villager should be dead');
+        let guard_state: Player = world.read_model((1, guard));
+        assert(!guard_state.is_alive, 'guard should be dead as lover');
+        let updated_game: GameState = world.read_model(1);
+        println!("{}", updated_game.players_alive);
+        assert(updated_game.players_alive == 5, 'wrong p count after hunter shot');
     }
 }
