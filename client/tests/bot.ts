@@ -1,11 +1,11 @@
 import { RpcProvider, Account, Contract, shortString, CallData } from 'starknet';
-import { promisify } from 'util';
-import fs from 'fs';
 import dotenv from 'dotenv';
 
 // Charger les variables d'environnement
 dotenv.config();
 
+// Importer l'ABI directement (adapté pour Vite)
+import abiData from './abi_actions.json';
 /**
  * Type for a Starknet contract address (hex string starting with 0x)
  */
@@ -15,7 +15,6 @@ type ContractAddress = string;
  * Type for a Starknet account address (hex string starting with 0x)
  */
 type AccountAddress = string;
-
 
 /**
  * Main class to interact with the StarkWolf game contract
@@ -35,17 +34,12 @@ export class StarkWolfGame {
     constructor(
         contractAddress: ContractAddress,
         nodeUrl: string = 'https://api.cartridge.gg/x/starkwolf/katana',
-        grpcUrl: string = 'http://localhost:8080'
     ) {
         this.provider = new RpcProvider({ nodeUrl });
         this.accounts = new Map();
         
-        // Load ABI from JSON file
-        const abiPath = './abi_actions.json';
-        const abiData = fs.readFileSync(abiPath, 'utf-8');
-        const abi = JSON.parse(abiData).abi;
-        this.contract = new Contract(abi, contractAddress, this.provider);
-
+        // Utiliser l'ABI importé directement
+        this.contract = new Contract(abiData.abi, contractAddress, this.provider);
     }
 
     addAccount(address: string, privateKey: string) {

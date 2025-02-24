@@ -3,11 +3,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Users, Plus, ArrowRight, X, Clock, Check, Wallet, ChevronLeft, ChevronRight } from 'lucide-react';
 import defaultAvatar from '../assets/default-avatar.png';
 import logo from '../assets/logo.webp';
-import { connect, disconnect } from "starknetkit";
-import { StarknetWindowObject } from "get-starknet-core";
+import { connect, disconnect, StarknetWindowObject } from "starknetkit";
+import { InjectedConnector } from "starknetkit/injected";
+import { WebWalletConnector } from "starknetkit/webwallet";
 import Background from '../assets/background.svg';
 import BackgroundNoSky from '../assets/backgroundnosky.webp';
 import { BackgroundStars } from './Background.tsx';
+import { RpcProvider, Contract, CallData } from 'starknet';
+import abiData from '../../tests/abi_actions.json'; // Correct ABI path
 
 // Role card imports
 import villagerCard from '../assets/cards/villager.webp';
@@ -27,6 +30,7 @@ interface Player {
   name: string;
   avatar: string;
   isReady: boolean;
+  address: string;
 }
 
 interface Role {
@@ -35,27 +39,43 @@ interface Role {
   description: string;
 }
 
-// Header Component
-const Header = () => {
+/** Header Component */
+const Header = ({ onConnect }: { onConnect: (wallet: StarknetWindowObject | undefined, address: string | undefined) => void }) => {
   const [connection, setConnection] = useState<StarknetWindowObject>();
   const [address, setAddress] = useState<string>();
 
   useEffect(() => {
     const connectToStarknet = async () => {
-      const { wallet } = await connect({ modalMode: "neverAsk" });
+      const { wallet } = await connect({
+        connectors: [
+          new InjectedConnector({ options: { id: "argentX" } }),
+          new InjectedConnector({ options: { id: "braavos" } }),
+        ],
+        modalMode: "neverAsk",
+      });
       if (wallet && wallet.isConnected) {
         setConnection(wallet);
         setAddress(wallet.selectedAddress);
+        onConnect(wallet, wallet.selectedAddress);
       }
     };
     connectToStarknet();
-  }, []);
+  }, [onConnect]);
 
   const connectWallet = async () => {
-    const { wallet } = await connect();
-    if (wallet) {
+    const { wallet } = await connect({
+      connectors: [
+        new InjectedConnector({ options: { id: "argentX" } }),
+        new InjectedConnector({ options: { id: "braavos" } }),
+        new WebWalletConnector({ url: "https://web.argent.xyz" }),
+      ],
+      modalMode: "alwaysAsk",
+      modalTheme: "dark",
+    });
+    if (wallet && wallet.isConnected) {
       setConnection(wallet);
       setAddress(wallet.selectedAddress);
+      onConnect(wallet, wallet.selectedAddress);
     }
   };
 
@@ -63,19 +83,22 @@ const Header = () => {
     await disconnect();
     setConnection(undefined);
     setAddress(undefined);
+    onConnect(undefined, undefined);
   };
 
   useEffect(() => {
     const handleAccountsChange = (accounts?: string[]) => {
       if (accounts && accounts.length > 0) {
         setAddress(accounts[0]);
+        onConnect(connection, accounts[0]);
       } else {
         setAddress(undefined);
+        onConnect(undefined, undefined);
       }
     };
     connection?.on("accountsChanged", handleAccountsChange);
     return () => connection?.off("accountsChanged", handleAccountsChange);
-  }, [connection]);
+  }, [connection, onConnect]);
 
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-gray-900/20 backdrop-blur-md border-b border-gray-700/30">
@@ -93,147 +116,139 @@ const Header = () => {
   );
 };
 
-// GameCard Component
-const GameCard = ({ title, players, maxPlayers, onClick }: { title: string; players: number; maxPlayers: number; onClick: () => void }) => (
-  <motion.div
-    whileHover={{ scale: 1.03, boxShadow: '0 0 15px rgba(153, 27, 27, 0.3)' }}
-    onClick={onClick}
-    className="bg-gray-950/80 rounded-xl p-6 transition-all cursor-pointer border border-red-900/40 hover:border-red-800/60 group relative overflow-hidden backdrop-blur-md"
-  >
-    <div className="absolute inset-0 bg-gradient-to-br from-red-950/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-    <h3 className="text-2xl font-serif font-bold text-red-300 group-hover:text-red-800 transition-colors relative z-10">{title}</h3>
-    <div className="flex items-center text-gray-300 mt-2 relative z-10">
-      <Users size={18} className="mr-2 text-red-400" />
-      <span className="text-lg">{players}/{maxPlayers} Souls</span>
-    </div>
-  </motion.div>
-);
+/** JoinGameSection Component */
+const JoinGameSection = forwardRef<HTMLDivElement, LobbyProps>((props, ref) => {
+  const [joinGameCode, setJoinGameCode] = useState('');
+  const [connectedAddress, setConnectedAddress] = useState<string | undefined>();
+  const [error, setError] = useState<string | null>(null);
+  const provider = new RpcProvider({ nodeUrl: 'https://api.cartridge.gg/x/starkwolf/katana' });
+  const contractAddress = '0x030caf705ec459e733e170c2ca7603642ae1ce52eaa3ac535f503c3a2ec6263e';
+  const contract = new Contract(abiData.abi, contractAddress, provider);
 
-const CreateGamePopup = ({
-  onClose,
-  gameCode,
-  players,
-  onStartGame,
-}: {
-  onClose: () => void;
-  gameCode: string;
-  players: Player[];
-  onStartGame: (code: string, maxPlayers: number) => void;
-}) => {
-  const [timeLeft, setTimeLeft] = useState(300);
-  const [maxPlayers, setMaxPlayers] = useState(8);
+  // Load bot accounts from .env
+  const botAccounts: { address: string; privateKey: string }[] = Array.from({ length: 7 }, (_, i) => ({
+    address: import.meta.env[`PLAYER${i}_ADDRESS`] as string,
+    privateKey: import.meta.env[`PLAYER${i}_PRIVATE_KEY`] as string,
+  })).filter(account => account.address && account.privateKey);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev <= 0 ? 0 : prev - 1));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const connectWallet = async () => {
+    const { wallet } = await connect({
+      connectors: [
+        new InjectedConnector({ options: { id: "argentX" } }),
+        new InjectedConnector({ options: { id: "braavos" } }),
+        new WebWalletConnector({ url: "https://web.argent.xyz" }),
+      ],
+      modalMode: "alwaysAsk",
+      modalTheme: "dark",
+    });
+    if (wallet && wallet.isConnected) {
+      setConnectedAddress(wallet.selectedAddress);
+      // Type assertion to handle ConnectedStarknetWindowObject
+      contract.connect(wallet as any); // Temporary workaround; ideally, extend types
+    }
+  };
 
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
+  const handleCreateGame = async () => {
+    if (!connectedAddress) {
+      await connectWallet();
+      if (!connectedAddress) {
+        setError("Wallet connection failed. Please connect your wallet.");
+        return;
+      }
+    }
+
+    if (botAccounts.length !== 7) {
+      setError("Exactly 7 bot accounts must be defined in .env.");
+      console.error("Bot accounts loaded:", botAccounts);
+      return;
+    }
+
+    try {
+      const gameId = Math.floor(Math.random() * 1000);
+      const players = [connectedAddress, ...botAccounts.map(bot => bot.address)];
+
+      // Check if game already exists (mimicking bot.ts)
+      try {
+        const gameState = await contract.get_game_state(gameId);
+        console.log('Existing game state:', gameState);
+        throw new Error('Game already exists with this ID');
+      } catch (error) {
+        console.log('No existing game found, creating new game...');
+      }
+
+      const calldata = CallData.compile({
+        game_id: gameId,
+        players: players,
+      });
+
+      const tx = await contract.start_game(calldata);
+      await provider.waitForTransaction(tx.transaction_hash);
+      console.log('Game created successfully with ID:', gameId);
+      props.onJoinGame(`HUNT-${gameId}`);
+    } catch (err) {
+      setError("Failed to create game. Check console for details.");
+      console.error("Game creation error:", err);
+    }
+  };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 backdrop-blur-xl flex items-center justify-center p-4 z-[60]"
-      style={{ top: '1.5rem' }}
-    >
+    <section ref={ref} className="min-h-screen snap-start flex items-center justify-center px-8">
       <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-gradient-to-b from-gray-950 to-gray-900 border border-red-900/30 rounded-xl p-6 w-full max-w-sm shadow-xl shadow-red-900/20"
+        initial={{ opacity: 0, y: 50 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1 }}
+        className="w-full max-w-5xl space-y-12"
       >
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-serif text-red-400">Summon a Hunt</h2>
-          <button 
-            onClick={onClose} 
-            className="text-gray-300 hover:text-gray-200 transition-colors"
+        <h2 className="text-5xl font-serif font-bold text-red-800 text-center drop-shadow-md">Join the Night's Hunt</h2>
+        <div className="grid md:grid-cols-2 gap-12">
+          <motion.div
+            className="space-y-6 bg-gray-950/40 p-8 rounded-xl border border-red-900/30 backdrop-blur-md shadow-lg"
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
           >
-            <X size={20} />
-          </button>
-        </div>
-        <div className="space-y-4">
-          <div className="bg-gray-900/50 rounded-lg p-3 border border-red-900/20">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-300">Hunt Code:</span>
-              <span className="text-lg font-mono font-bold text-red-400">{gameCode}</span>
+            <h3 className="text-3xl font-serif text-red-400">Enter the Fray</h3>
+            <div className="flex gap-4">
+              <input
+                type="text"
+                placeholder="Enter hunt code"
+                value={joinGameCode}
+                onChange={(e) => setJoinGameCode(e.target.value)}
+                className="flex-1 bg-gray-900/60 rounded-lg px-4 py-3 text-lg text-gray-200 placeholder-gray-500 border border-red-900/40 focus:border-red-800 focus:outline-none transition-all duration-300"
+              />
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => joinGameCode && props.onJoinGame(joinGameCode)}
+                className="bg-gradient-to-r from-red-900 to-red-800 hover:from-red-800 hover:to-red-700 text-gray-100 font-bold px-6 py-3 rounded-lg flex items-center transition-all duration-300 shadow-md"
+              >
+                <ArrowRight size={24} />
+              </motion.button>
             </div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-300">Souls:</span>
-              <div className="flex items-center gap-3 text-red-400">
-                <button 
-                  onClick={() => setMaxPlayers(prev => Math.max(6, prev - 1))}
-                  className="p-1 hover:bg-gray-800/20 rounded transition-colors"
-                >
-                  -
-                </button>
-                <span className="text-lg font-bold w-6 text-center">{maxPlayers}</span>
-                <button 
-                  onClick={() => setMaxPlayers(prev => Math.min(10, prev + 1))}
-                  className="p-1 hover:bg-gray-800/20 rounded transition-colors"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock size={14} className="text-red-400" />
-              <span className="text-gray-300 text-sm">{`${minutes}:${seconds.toString().padStart(2, '0')}`}</span>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <h3 className="text-md font-serif text-red-300">Hunters ({players.length}/{maxPlayers})</h3>
-            <div className="space-y-1.5 max-h-48 overflow-y-auto">
-              {[...players, ...Array(maxPlayers - players.length)].map((player, index) => (
-                <div
-                  key={player?.id || `empty-${index}`}
-                  className="bg-gray-900/30 rounded-md p-2 border border-red-900/20 flex items-center gap-2"
-                >
-                  {player ? (
-                    <>
-                      <img 
-                        src={player.avatar || defaultAvatar} 
-                        alt={player.name} 
-                        className="w-6 h-6 rounded-full border border-red-900/30" 
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-200 truncate">{player.name}</p>
-                        <p className="text-xs text-gray-400">{player.isReady ? 'Prepared' : 'Awaiting...'}</p>
-                      </div>
-                      {player.isReady && <Check size={14} className="text-green-400 shrink-0" />}
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-center w-full text-xs text-gray-500">
-                      Awaiting a hunter...
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-          <button
-            onClick={() => onStartGame(gameCode, maxPlayers)}
-            className="w-full bg-gradient-to-r from-red-900 to-red-800 hover:from-red-800 hover:to-red-700 text-gray-100 font-bold rounded-lg px-4 py-2 text-sm transition-all duration-300 shadow-lg shadow-red-900/20"
-          >
-            Begin the Hunt
-          </button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleCreateGame}
+              className="w-full bg-gray-900/50 hover:bg-gray-900/70 text-red-300 font-serif font-bold rounded-lg px-6 py-4 flex items-center justify-center gap-3 transition-all duration-300 border border-red-900/40 shadow-lg"
+            >
+              <Plus size={24} />
+              Summon a New Hunt
+            </motion.button>
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+          </motion.div>
         </div>
       </motion.div>
-    </motion.div>
+    </section>
   );
-};
+});
 
-// RoleCard Component
+/** RoleCard Component */
 interface RoleCardProps {
   role: Role;
   isActive?: boolean;
   isAdjacent?: boolean;
 }
-const RoleCard: React.FC<RoleCardProps> = ({ role, isActive = false, isAdjacent = false }) => {
+const RoleCard: React.FC<RoleCardProps> = ({ role, isActive = false }) => {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -291,10 +306,10 @@ const RoleCard: React.FC<RoleCardProps> = ({ role, isActive = false, isAdjacent 
   );
 };
 
-// InfiniteLinearCarousel Component
+/** InfiniteLinearCarousel Component */
 const InfiniteLinearCarousel = ({ roles }: { roles: Role[] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [direction, setDirection] = useState<'left'|'right'>('right');
+  const [direction, setDirection] = useState<'left' | 'right'>('right');
   const totalItems = roles.length;
 
   const getVisibleItems = () => {
@@ -384,114 +399,7 @@ const InfiniteLinearCarousel = ({ roles }: { roles: Role[] }) => {
   );
 };
 
-// JoinGameSection Component with forwardRef
-const JoinGameSection = forwardRef<HTMLDivElement, LobbyProps>((props, ref) => {
-  const [joinGameCode, setJoinGameCode] = useState('');
-  const [showCreatePopup, setShowCreatePopup] = useState(false);
-
-  const mockGameCode = 'WOLF-7829';
-  const mockPlayers: Player[] = [
-    { id: '1', name: 'Emma Thompson', avatar: '../assets/default-avatar.png', isReady: true },
-    { id: '2', name: 'Marcus Chen', avatar: '../assets/default-avatar.png', isReady: true },
-    { id: '3', name: 'Luna Black', avatar: '../assets/default-avatar.png', isReady: false },
-    { id: '4', name: 'Alex Hunt', avatar: '../assets/default-avatar.png', isReady: false },
-  ];
-
-  const mockGames = [
-    { id: '1', title: "Moonlit Hunt", players: 5, maxPlayers: 8 },
-    { id: '2', title: "Shadow Pack", players: 8, maxPlayers: 10 },
-    { id: '3', title: "Blood Moon", players: 3, maxPlayers: 6 },
-  ];
-
-  const handleStartGame = (code: string, maxPlayers: number) => {
-    setShowCreatePopup(false);
-    props.onJoinGame(code);
-  };
-
-  return (
-    <section ref={ref} className="min-h-screen snap-start flex items-center justify-center px-8">
-      <motion.div
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1 }}
-        className="w-full max-w-5xl space-y-12"
-      >
-        <h2 className="text-5xl font-serif font-bold text-red-800 text-center drop-shadow-md">Join the Night's Hunt</h2>
-        <div className="grid md:grid-cols-2 gap-12">
-          {/* Join Game */}
-          <motion.div
-            className="space-y-6 bg-gray-950/40 p-8 rounded-xl border border-red-900/30 backdrop-blur-md shadow-lg"
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-          >
-            <h3 className="text-3xl font-serif text-red-400">Enter the Fray</h3>
-            <div className="flex gap-4">
-              <input
-                type="text"
-                placeholder="Enter hunt code"
-                value={joinGameCode}
-                onChange={(e) => setJoinGameCode(e.target.value)}
-                className="flex-1 bg-gray-900/60 rounded-lg px-4 py-3 text-lg text-gray-200 placeholder-gray-500 border border-red-900/40 focus:border-red-800 focus:outline-none transition-all duration-300"
-              />
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => joinGameCode && props.onJoinGame(joinGameCode)}
-                className="bg-gradient-to-r from-red-900 to-red-800 hover:from-red-800 hover:to-red-700 text-gray-100 font-bold px-6 py-3 rounded-lg flex items-center transition-all duration-300 shadow-md"
-              >
-                <ArrowRight size={24} />
-              </motion.button>
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setShowCreatePopup(true)}
-              className="w-full bg-gray-900/50 hover:bg-gray-900/70 text-red-300 font-serif font-bold rounded-lg px-6 py-4 flex items-center justify-center gap-3 transition-all duration-300 border border-red-900/40 shadow-lg"
-            >
-              <Plus size={24} />
-              Summon a New Hunt
-            </motion.button>
-          </motion.div>
-
-          {/* Active Games */}
-          <motion.div
-            className="space-y-6"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-          >
-            <h3 className="text-3xl font-serif text-red-400">Active Hunts</h3>
-            <div className="space-y-4">
-              {mockGames.map((game) => (
-                <GameCard
-                  key={game.id}
-                  title={game.title}
-                  players={game.players}
-                  maxPlayers={game.maxPlayers}
-                  onClick={() => props.onJoinGame(game.id)}
-                />
-              ))}
-            </div>
-          </motion.div>
-        </div>
-
-        <AnimatePresence>
-          {showCreatePopup && (
-            <CreateGamePopup
-              onClose={() => setShowCreatePopup(false)}
-              gameCode={mockGameCode}
-              players={mockPlayers}
-              onStartGame={handleStartGame}
-            />
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </section>
-  );
-});
-
-// Footer Component Corrigé
+/** Footer Component */
 const Footer = forwardRef<HTMLDivElement>((props, ref) => (
   <footer ref={ref} className="bg-gray-950/90 border-t border-red-900/30 py-6 w-full snap-stop mt-auto">
     <div className="mx-auto px-4 w-full">
@@ -507,8 +415,11 @@ const Footer = forwardRef<HTMLDivElement>((props, ref) => (
   </footer>
 ));
 
-// Main Lobby Component
+/** Main Lobby Component */
 export default function Lobby({ onJoinGame }: LobbyProps) {
+  const [connection, setConnection] = useState<StarknetWindowObject | undefined>();
+  const [connectedAddress, setConnectedAddress] = useState<string | undefined>();
+
   const roles: Role[] = [
     { image: villagerCard, name: "Villager", description: "A simple townsfolk trying to survive and root out the werewolves." },
     { image: werewolfCard, name: "Werewolf", description: "A cunning predator who hunts villagers under the cover of night." },
@@ -521,6 +432,11 @@ export default function Lobby({ onJoinGame }: LobbyProps) {
 
   const rolesSectionRef = React.useRef<HTMLDivElement>(null);
   const footerRef = React.useRef<HTMLDivElement>(null);
+
+  const handleConnect = (wallet: StarknetWindowObject | undefined, address: string | undefined) => {
+    setConnection(wallet);
+    setConnectedAddress(address);
+  };
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -547,7 +463,6 @@ export default function Lobby({ onJoinGame }: LobbyProps) {
 
   return (
     <div className="font-[Crimson Text] overflow-x-hidden relative min-h-screen snap-y snap-mandatory">
-      {/* Background Layers */}
       <div className="fixed inset-0 z-0">
         <img src={Background} alt="Background" className="w-full h-full object-cover" />
       </div>
@@ -558,11 +473,8 @@ export default function Lobby({ onJoinGame }: LobbyProps) {
         <img src={BackgroundNoSky} alt="BackgroundNoSky" className="w-full h-full object-cover" />
       </div>
 
-      {/* Content */}
       <div className="relative z-10 flex flex-col min-h-screen">
-        <Header />
-
-        {/* Welcome Section */}
+        <Header onConnect={handleConnect} />
         <section className="min-h-screen flex items-center justify-center snap-start">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
@@ -578,11 +490,7 @@ export default function Lobby({ onJoinGame }: LobbyProps) {
             </p>
           </motion.div>
         </section>
-
-        {/* Join Game Section */}
         <JoinGameSection onJoinGame={onJoinGame} />
-
-        {/* Roles Section */}
         <section ref={rolesSectionRef} className="min-h-screen flex flex-col items-center justify-center snap-start py-16">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
@@ -596,7 +504,6 @@ export default function Lobby({ onJoinGame }: LobbyProps) {
           </motion.div>
           <InfiniteLinearCarousel roles={roles} />
         </section>
-
         <Footer ref={footerRef} />
       </div>
 
