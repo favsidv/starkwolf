@@ -324,77 +324,16 @@ pub mod actions {
                 world.write_model(@target_player);
             }
 
-            let updated_game: GameState = world.read_model(game_id);
             let mut new_game = GameState {
                 game_id: game.game_id,
-                phase: Phase::Day,
-                players_alive: updated_game.players_alive,
-                werewolves_alive: updated_game.werewolves_alive,
-                day_count: game.day_count + 1,
+                phase: Phase::Night,
+                players_alive: game.players_alive,
+                werewolves_alive: game.werewolves_alive,
+                day_count: game.day_count,
                 phase_start_timestamp: starknet::get_block_timestamp(),
-                day_duration: 30,
+                day_duration: game.day_duration,
                 night_action_duration: game.night_action_duration,
                 players: game.players.clone(),
-            };
-            let mut i = 0;
-            loop {
-                if i >= game.players.len() {
-                    break;
-                }
-                let mut p: Player = world.read_model((game_id, *game.players[i]));
-                p.is_protected = false;
-                world.write_model(@p);
-                i += 1;
-            };
-            world.write_model(@new_game);
-        }
-fn witch_action(ref self: ContractState, game_id: u32, target: ContractAddress, heal_potion: bool, kill_potion: bool) {
-            let mut world = self.world_default();
-            let caller = get_caller_address();
-            let game: GameState = world.read_model(game_id);
-            assert(game.phase == Phase::Night, 'Night only');
-            assert(self.is_phase_time_valid(@game), 'Night expired');
-
-            let mut witch: Player = world.read_model((game_id, caller));
-            assert(witch.role == Role::Witch, 'Not Witch');
-            assert(witch.is_alive, 'Witch dead');
-            assert(!(heal_potion && kill_potion), 'One potion only');
-
-            let mut potions: WitchPotions = world.read_model(game_id);
-            let mut target_player: Player = world.read_model((game_id, target));
-
-            if kill_potion && target_player.is_alive && potions.has_death_potion {
-                potions.has_death_potion = false;
-                world.write_model(@potions);
-                self.kill_player(game_id, target, false);
-            } else if heal_potion && !target_player.is_alive && potions.has_life_potion {
-                potions.has_life_potion = false;
-                world.write_model(@potions);
-                target_player.is_alive = true;
-                world.write_model(@target_player);
-            }
-
-            let updated_game: GameState = world.read_model(game_id);
-            let mut new_game = GameState {
-                game_id: game.game_id,
-                phase: Phase::Day,
-                players_alive: updated_game.players_alive,
-                werewolves_alive: updated_game.werewolves_alive,
-                day_count: game.day_count + 1,
-                phase_start_timestamp: starknet::get_block_timestamp(),
-                day_duration: 30,
-                night_action_duration: game.night_action_duration,
-                players: game.players.clone(),
-            };
-            let mut i = 0;
-            loop {
-                if i >= game.players.len() {
-                    break;
-                }
-                let mut p: Player = world.read_model((game_id, *game.players[i]));
-                p.is_protected = false;
-                world.write_model(@p);
-                i += 1;
             };
             world.write_model(@new_game);
         }
@@ -413,7 +352,7 @@ fn witch_action(ref self: ContractState, game_id: u32, target: ContractAddress, 
                 werewolves_alive: updated_game.werewolves_alive,
                 day_count: game.day_count + 1,
                 phase_start_timestamp: starknet::get_block_timestamp(),
-                day_duration: 30,
+                day_duration: 120,
                 night_action_duration: game.night_action_duration,
                 players: game.players.clone(),
             };
