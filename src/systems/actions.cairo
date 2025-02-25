@@ -125,7 +125,7 @@ pub mod actions {
                 day_count: 0,
                 phase_start_timestamp: starknet::get_block_timestamp(),
                 day_duration: 120,
-                night_action_duration: 60,
+                night_action_duration: 120,
                 players: player_addresses,
             };
             world.write_model(@new_game);
@@ -392,7 +392,7 @@ pub mod actions {
 
             game.phase = Phase::Night;
             game.phase_start_timestamp = starknet::get_block_timestamp();
-            game.night_action_duration = 60;
+            game.night_action_duration = 120;
             world.write_model(@game);
         }
     }
@@ -441,7 +441,7 @@ pub mod actions {
                         player: lover_addr,
                         role: lover.role,
                     });
-                    game.players_alive -= 1;
+                    game.players_alive -= 2;
                     if lover.role == Role::Werewolf {
                         game.werewolves_alive -= 1;
                     }

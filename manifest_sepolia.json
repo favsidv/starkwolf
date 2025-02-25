@@ -1313,7 +1313,7 @@
   "contracts": [
     {
       "address": "0x2f5c289133869e42ddf01b1c6dbf6b17d06f19ebf2105b118ac892cb3a1b8c9",
-      "class_hash": "0x2a0f92f115d60c843f4cc3ccee0254ce7d5e18e9a7e887fb8ebe38e940edcb0",
+      "class_hash": "0x531e99a94208de82bf44da1bb9498c4d3b1c499529b0e6c96b697b58dd3fdef",
       "abi": [
         {
           "type": "impl",

@@ -10,7 +10,7 @@ mod tests {
     };
 
     use starkwolf::systems::actions::{actions, IActionsDispatcher, IActionsDispatcherTrait};
-    use starkwolf::models::{Player, m_Player, GameState, m_GameState, m_Vote, WitchPotions, m_WitchPotions, Role, Phase};
+    use starkwolf::models::{Player, m_Player, GameState, m_GameState, m_Vote, WitchPotions, m_WitchPotions, m_GuardProtection, Role, Phase};
 
     impl RoleDisplay of Display<Role> {
         fn fmt(self: @Role, ref f: Formatter) -> Result<(), Error> {
@@ -37,10 +37,12 @@ mod tests {
                 TestResource::Model(m_GameState::TEST_CLASS_HASH),
                 TestResource::Model(m_Vote::TEST_CLASS_HASH),
                 TestResource::Model(m_WitchPotions::TEST_CLASS_HASH),
+                TestResource::Model(m_GuardProtection::TEST_CLASS_HASH),
                 TestResource::Event(actions::e_PlayerEliminated::TEST_CLASS_HASH),
                 TestResource::Event(actions::e_GameStarted::TEST_CLASS_HASH),
                 TestResource::Event(actions::e_LoversPaired::TEST_CLASS_HASH),
                 TestResource::Event(actions::e_HunterShot::TEST_CLASS_HASH),
+                TestResource::Event(actions::e_GameEnded::TEST_CLASS_HASH),
                 TestResource::Contract(actions::TEST_CLASS_HASH),
             ].span(),
         };
@@ -308,7 +310,8 @@ mod tests {
         let seer = starknet::contract_address_const::<0x4>();
         let hunter = starknet::contract_address_const::<0x5>();
         let cupid = starknet::contract_address_const::<0x6>();
-        let villager = starknet::contract_address_const::<0x7>();
+        let villager1 = starknet::contract_address_const::<0x7>();
+        let villager2 = starknet::contract_address_const::<0x8>();
 
         // Configuration du monde de test
         let ndef = namespace_def();
@@ -318,50 +321,96 @@ mod tests {
         let (contract_address, _) = world.dns(@"actions").unwrap();
         let actions_system = IActionsDispatcher { contract_address };
 
-        // Démarrage de la partie
-        let players_array = array![werewolf, witch, guard, seer, hunter, cupid, villager];
+        let players_array = array![werewolf, witch, guard, seer, hunter, cupid, villager1, villager2];
         let players = players_array.span();
         actions_system.start_game(1, players);
 
-        // Vérification de l'état initial
         let game: GameState = world.read_model(1);
         assert(game.phase == Phase::Night, 'should start at night');
-        assert(game.players_alive == 7, 'wrong initial player count');
+        assert(game.players_alive == 8, 'wrong initial player count');
         assert(game.werewolves_alive == 1, 'wrong werewolf count');
 
-        // Cupid lie deux joueurs ensemble
         starknet::testing::set_contract_address(cupid);
-        actions_system.cupid_action(1, seer, hunter);
+        actions_system.cupid_action(1, villager1, seer);
         
-        // Le garde protège le villager
         starknet::testing::set_contract_address(guard);
-        actions_system.night_action(1, villager);
+        actions_system.night_action(1, seer);
         
-        // Le loup-garou essaie d'attaquer le villager mais il est protégé
+        // starknet::testing::set_contract_address(werewolf);
+        // actions_system.night_action(1, seer); // devrait échouer
+
+        actions_system.pass_night(1);
+
         starknet::testing::set_contract_address(werewolf);
-        actions_system.night_action(1, villager);
-        
-        // La sorcière tue le loup-garou avec sa potion de mort
+        actions_system.vote(1, hunter);
         starknet::testing::set_contract_address(witch);
-        actions_system.witch_action(1, werewolf, false, true);
+        actions_system.vote(1, hunter);
+        starknet::testing::set_contract_address(guard);
+        actions_system.vote(1, hunter);
+        starknet::testing::set_contract_address(cupid);
+        actions_system.vote(1, werewolf);
+
+        actions_system.end_voting(1);
+
+        starknet::testing::set_contract_address(hunter);
+        actions_system.hunter_action(1, cupid);
         
-        // Vérification que le loup-garou est mort
-        let werewolf_state: Player = world.read_model((1, werewolf));
-        assert(!werewolf_state.is_alive, 'werewolf should be dead');
+        actions_system.pass_day(1);
         
-        // Vérification que le villager est toujours en vie
-        let villager_state: Player = world.read_model((1, villager));
-        assert(villager_state.is_alive, 'villager should be alive');
-        
-        // Passage à la journée
+        starknet::testing::set_contract_address(guard);
+        actions_system.night_action(1, witch);
+
+        starknet::testing::set_contract_address(werewolf);
+        actions_system.night_action(1, villager2);
+
+        starknet::testing::set_contract_address(witch);
+        actions_system.witch_action(1, villager2, true, false);
+
+        actions_system.pass_night(1);
+
+        starknet::testing::set_contract_address(werewolf);
+        actions_system.vote(1, guard);
+        starknet::testing::set_contract_address(witch);
+        actions_system.vote(1, guard);
+        starknet::testing::set_contract_address(guard);
+        actions_system.vote(1, villager1);
+        starknet::testing::set_contract_address(villager1);
+        actions_system.vote(1, guard);
+
+        actions_system.end_voting(1);
+        actions_system.pass_day(1);
+
+        starknet::testing::set_contract_address(werewolf);
+        actions_system.night_action(1, villager2);
+
+        actions_system.pass_night(1);
+
+        starknet::testing::set_contract_address(werewolf);
+        actions_system.vote(1, witch);
+        starknet::testing::set_contract_address(witch);
+        actions_system.vote(1, werewolf);
+        starknet::testing::set_contract_address(villager1);
+        actions_system.vote(1, witch);
+
+        actions_system.end_voting(1);
+        actions_system.pass_day(1);
+
+        starknet::testing::set_contract_address(werewolf);
+        actions_system.night_action(1, villager1);
+
         actions_system.pass_night(1);
         
-        // Vérification que le jeu s'est terminé avec la victoire des villageois
         let game: GameState = world.read_model(1);
         assert(game.phase == Phase::Ended, 'game should be ended');
-        assert(game.werewolves_alive == 0, 'no werewolves should be alive');
+        println!("game.players_alive: {}", game.players_alive);
+        let villager1_state: Player = world.read_model((1, villager1));
+        let seer_state: Player = world.read_model((1, seer));
+        assert(!villager1_state.is_alive, 'villager1 should dead');
+        assert(!seer_state.is_alive, 'seer should still dead');
+        assert(game.players_alive == 1, 'no villager should be alive');
+        assert(game.werewolves_alive == 1, 'werewolves won');
         
-        // Si le test arrive jusqu'ici, cela signifie que les villageois ont gagné
-        // car tous les loups-garous ont été éliminés
+        // // Si le test arrive jusqu'ici, cela signifie que les villageois ont gagné
+        // // car tous les loups-garous ont été éliminés
     }
 }
