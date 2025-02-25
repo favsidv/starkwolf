@@ -9,6 +9,7 @@ pub trait IActions<T> {
     fn cupid_action(ref self: T, game_id: u32, lover1: ContractAddress, lover2: ContractAddress);
     fn hunter_action(ref self: T, game_id: u32, target: ContractAddress);
     fn witch_action(ref self: T, game_id: u32, target: ContractAddress, heal_potion: bool, kill_potion: bool);
+    fn seer_action(ref self: T, game_id: u32, target: ContractAddress) -> Role;
     fn pass_night(ref self: T, game_id: u32);
     fn end_voting(ref self: T, game_id: u32);
     fn pass_day(ref self: T, game_id: u32);
@@ -291,6 +292,22 @@ pub mod actions {
                 }
                 world.write_model(@game);
             }
+        }
+
+        fn seer_action(ref self: ContractState, game_id: u32, target: ContractAddress) -> Role {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+            let game: GameState = world.read_model(game_id);
+            assert(game.phase == Phase::Night, 'Night only');
+            assert(self.is_phase_time_valid(@game), 'Night expired');
+
+            let seer: Player = world.read_model((game_id, caller));
+            assert(seer.role == Role::Seer, 'Not Seer');
+            assert(seer.is_alive, 'Seer dead');
+
+            let target_player: Player = world.read_model((game_id, target));
+            assert(target_player.is_alive, 'Target dead');
+            target_player.role
         }
 
         fn pass_night(ref self: ContractState, game_id: u32) {

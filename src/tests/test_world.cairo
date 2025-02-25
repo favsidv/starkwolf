@@ -335,6 +335,10 @@ mod tests {
         
         starknet::testing::set_contract_address(guard);
         actions_system.night_action(1, seer);
+
+        starknet::testing::set_contract_address(seer);
+        let role = actions_system.seer_action(1, werewolf);
+        assert(role == Role::Werewolf, 'seer should see werewolf');
         
         // starknet::testing::set_contract_address(werewolf);
         // actions_system.night_action(1, seer); // devrait échouer
