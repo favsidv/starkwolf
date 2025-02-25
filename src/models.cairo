@@ -23,6 +23,14 @@ pub struct WitchPotions {
     pub has_death_potion: bool,
 }
 
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+struct GuardProtection {
+    #[key]
+    pub game_id: u32,
+    pub last_protected: ContractAddress,
+}
+
 #[derive(Drop, Serde, Debug)]
 #[dojo::model]
 pub struct GameState {
