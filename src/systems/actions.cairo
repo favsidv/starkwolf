@@ -8,6 +8,7 @@ pub trait IActions<T> {
     fn night_action(ref self: T, game_id: u32, target: ContractAddress);
     fn cupid_action(ref self: T, game_id: u32, lover1: ContractAddress, lover2: ContractAddress);
     fn hunter_action(ref self: T, game_id: u32, target: ContractAddress);
+    fn witch_action(ref self: T, game_id: u32, target: ContractAddress, heal_potion: bool, kill_potion: bool);
     fn end_voting(ref self: T, game_id: u32);
 }
 
@@ -57,11 +58,11 @@ pub mod actions {
         fn start_game(ref self: ContractState, game_id: u32, players: Span<ContractAddress>) {
             let mut world = self.world_default();
             let game: GameState = world.read_model(game_id);
-            assert(game.phase == Phase::Lobby, 'E01');
+            assert(game.phase == Phase::Lobby, 'Game started');
 
             let player_count = players.len();
-            assert(player_count >= 6, 'E02.1');
-            assert(player_count <= 12, 'E02.2');
+            assert(player_count >= 6, 'Min 6 players');
+            assert(player_count <= 12, 'Max 12 players');
 
             let mut i = 0;
             let mut werewolves = 0;
@@ -112,7 +113,7 @@ pub mod actions {
                 day_count: 0,
                 phase_start_timestamp: starknet::get_block_timestamp(),
                 day_duration: 120,
-                night_action_duration: 35,
+                night_action_duration: 40,
                 players: player_addresses,
             };
             world.write_model(@new_game);
@@ -124,13 +125,13 @@ pub mod actions {
             let mut world = self.world_default();
             let caller = get_caller_address();
             let game: GameState = world.read_model(game_id);
-            assert(game.phase == Phase::Day, 'E03');
-            assert(self.is_phase_time_valid(@game), 'E04');
+            assert(game.phase == Phase::Day, 'Day only');
+            assert(self.is_phase_time_valid(@game), 'Day expired');
 
             let mut voter: Player = world.read_model((game_id, caller));
             let target_player: Player = world.read_model((game_id, target));
-            assert(voter.is_alive, 'E05');
-            assert(target_player.is_alive, 'E06');
+            assert(voter.is_alive, 'Voter dead');
+            assert(target_player.is_alive, 'Target dead');
 
             if voter.has_voted {
                 let mut current_vote: Vote = world.read_model((game_id, caller));
@@ -152,37 +153,42 @@ pub mod actions {
         fn night_action(ref self: ContractState, game_id: u32, target: ContractAddress) {
             let mut world = self.world_default();
             let caller = get_caller_address();
-            let game: GameState = world.read_model(game_id);
-            assert(game.phase == Phase::Night, 'E08');
-            assert(self.is_phase_time_valid(@game), 'E09');
-
+            let mut game: GameState = world.read_model(game_id);
+            assert(game.phase == Phase::Night, 'Night only');
+            assert(self.is_phase_time_valid(@game), 'Night expired');
+        
+            let current_time = self.get_current_timestamp();
+            if current_time > game.phase_start_timestamp + 30 {
+                let mut i = 0;
+                loop {
+                    if i >= game.players.len() {
+                        break;
+                    }
+                    let mut player: Player = world.read_model((game_id, *game.players[i]));
+                    if player.role == Role::Hunter && player.is_alive {
+                        player.is_alive = false;
+                        world.write_model(@player);
+                        world.emit_event(@PlayerEliminated { game_id, player: *game.players[i] });
+                        game.players_alive -= 1;
+                        break;
+                    }
+                    i += 1;
+                };
+            }
+        
             let mut player: Player = world.read_model((game_id, caller));
-            assert(player.is_alive, 'E10');
-
+            assert(player.is_alive, 'Player dead');
+        
             match player.role {
                 Role::Werewolf => {
                     let target_player: Player = world.read_model((game_id, target));
-                    if !target_player.is_protected && target_player.is_alive {
+                    if target_player.is_alive && !target_player.is_protected {
                         self.kill_player(game_id, target, false);
-                    }
-                },
-                Role::Witch => {
-                    let mut potions: WitchPotions = world.read_model(game_id);
-                    let mut target_player: Player = world.read_model((game_id, target));
-                    if target_player.is_alive && potions.has_death_potion {
-                        potions.has_death_potion = false;
-                        world.write_model(@potions);
-                        self.kill_player(game_id, target, false);
-                    } else if !target_player.is_alive && potions.has_life_potion {
-                        potions.has_life_potion = false;
-                        world.write_model(@potions);
-                        target_player.is_alive = true;
-                        world.write_model(@target_player);
                     }
                 },
                 Role::Guard => {
                     let mut target_player: Player = world.read_model((game_id, target));
-                    assert(target_player.is_alive, 'E11');
+                    assert(target_player.is_alive, 'Target dead');
                     let mut i = 0;
                     loop {
                         if i >= game.players.len() {
@@ -196,33 +202,21 @@ pub mod actions {
                     target_player.is_protected = true;
                     world.write_model(@target_player);
                 },
-                _ => assert(false, 'E13'),
+                _ => assert(false, 'Invalid role'),
             };
-
+        
             let updated_game: GameState = world.read_model(game_id);
             let mut new_game = GameState {
                 game_id: game.game_id,
-                phase: if player.role == Role::Werewolf { Phase::Day } else { Phase::Night },
+                phase: Phase::Night,
                 players_alive: updated_game.players_alive,
                 werewolves_alive: updated_game.werewolves_alive,
-                day_count: if player.role == Role::Werewolf { game.day_count + 1 } else { game.day_count },
+                day_count: game.day_count,
                 phase_start_timestamp: starknet::get_block_timestamp(),
                 day_duration: game.day_duration,
                 night_action_duration: game.night_action_duration,
                 players: game.players.clone(),
             };
-            if player.role == Role::Werewolf {
-                let mut i = 0;
-                loop {
-                    if i >= game.players.len() {
-                        break;
-                    }
-                    let mut p: Player = world.read_model((game_id, *game.players[i]));
-                    p.is_protected = false;
-                    world.write_model(@p);
-                    i += 1;
-                };
-            }
             world.write_model(@new_game);
         }
 
@@ -230,18 +224,18 @@ pub mod actions {
             let mut world = self.world_default();
             let caller = get_caller_address();
             let game: GameState = world.read_model(game_id);
-            assert(game.phase == Phase::Night, 'E19');
-            assert(game.day_count == 0, 'E20');
-            assert(self.is_phase_time_valid(@game), 'E21');
+            assert(game.phase == Phase::Night, 'Night only');
+            assert(game.day_count == 0, 'Cupid night 0');
+            assert(self.is_phase_time_valid(@game), 'Night expired');
 
             let cupid: Player = world.read_model((game_id, caller));
-            assert(cupid.role == Role::Cupid, 'E22');
-            assert(cupid.is_alive, 'E23');
+            assert(cupid.role == Role::Cupid, 'Not Cupid');
+            assert(cupid.is_alive, 'Cupid dead');
 
             let mut player1: Player = world.read_model((game_id, lover1));
             let mut player2: Player = world.read_model((game_id, lover2));
-            assert(player1.is_alive && player2.is_alive, 'E24');
-            assert((player1.lover_target == Option::None) && (player2.lover_target == Option::None), 'E25');
+            assert(player1.is_alive && player2.is_alive, 'Lovers dead');
+            assert(player1.lover_target.is_none() && player2.lover_target.is_none(), 'Already paired');
 
             player1.lover_target = Option::Some(lover2);
             player2.lover_target = Option::Some(lover1);
@@ -250,7 +244,7 @@ pub mod actions {
 
             let mut new_game = GameState {
                 game_id: game.game_id,
-                phase: game.phase,
+                phase: Phase::Night,
                 players_alive: game.players_alive,
                 werewolves_alive: game.werewolves_alive,
                 day_count: game.day_count,
@@ -268,29 +262,107 @@ pub mod actions {
             let mut world = self.world_default();
             let caller = get_caller_address();
             let mut game: GameState = world.read_model(game_id);
-            let hunter: Player = world.read_model((game_id, caller));
+            assert(game.phase == Phase::Day, 'Day only');
 
-            assert(hunter.role == Role::Hunter, 'E30');
-            assert(!hunter.is_alive, 'E31');
+            let mut hunter: Player = world.read_model((game_id, caller));
+            assert(hunter.role == Role::Hunter, 'Not Hunter');
+            assert(hunter.is_alive, 'Hunter should be alive');
 
             let current_time = self.get_current_timestamp();
-            assert(current_time <= game.phase_start_timestamp + game.night_action_duration, 'E32');
+            assert(current_time <= game.phase_start_timestamp + 30, 'Hunter too late');
 
             let target_player: Player = world.read_model((game_id, target));
-            assert(target_player.is_alive, 'E33');
+            assert(target_player.is_alive, 'Target dead');
 
             self.kill_player(game_id, target, false);
             world.emit_event(@HunterShot { game_id, hunter: caller, target });
+
+            hunter.is_alive = false;
+            world.write_model(@hunter);
+            world.emit_event(@PlayerEliminated { game_id, player: caller });
+
+            let updated_game: GameState = world.read_model(game_id);
+            let mut new_game = GameState {
+                game_id: game.game_id,
+                phase: Phase::Night,
+                players_alive: updated_game.players_alive - 1,
+                werewolves_alive: updated_game.werewolves_alive,
+                day_count: game.day_count,
+                phase_start_timestamp: starknet::get_block_timestamp(),
+                day_duration: 120,
+                night_action_duration: game.night_action_duration,
+                players: game.players.clone(),
+            };
+
+            world.write_model(@new_game);
+        }
+
+        fn witch_action(ref self: ContractState, game_id: u32, target: ContractAddress, heal_potion: bool, kill_potion: bool) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+            let game: GameState = world.read_model(game_id);
+            assert(game.phase == Phase::Night, 'Night only');
+            assert(self.is_phase_time_valid(@game), 'Night expired');
+
+            let mut witch: Player = world.read_model((game_id, caller));
+            assert(witch.role == Role::Witch, 'Not Witch');
+            assert(witch.is_alive, 'Witch dead');
+            assert(!(heal_potion && kill_potion), 'One potion only');
+
+            let mut potions: WitchPotions = world.read_model(game_id);
+            let mut target_player: Player = world.read_model((game_id, target));
+
+            if kill_potion && target_player.is_alive && potions.has_death_potion {
+                potions.has_death_potion = false;
+                world.write_model(@potions);
+                self.kill_player(game_id, target, false);
+            } else if heal_potion && !target_player.is_alive && potions.has_life_potion {
+                potions.has_life_potion = false;
+                world.write_model(@potions);
+                target_player.is_alive = true;
+                world.write_model(@target_player);
+            }
+
+            let updated_game: GameState = world.read_model(game_id);
+            let mut new_game = GameState {
+                game_id: game.game_id,
+                phase: Phase::Day,
+                players_alive: updated_game.players_alive,
+                werewolves_alive: updated_game.werewolves_alive,
+                day_count: game.day_count + 1,
+                phase_start_timestamp: starknet::get_block_timestamp(),
+                day_duration: 30,
+                night_action_duration: game.night_action_duration,
+                players: game.players.clone(),
+            };
+            let mut i = 0;
+            loop {
+                if i >= game.players.len() {
+                    break;
+                }
+                let mut p: Player = world.read_model((game_id, *game.players[i]));
+                p.is_protected = false;
+                world.write_model(@p);
+                i += 1;
+            };
+            world.write_model(@new_game);
         }
 
         fn end_voting(ref self: ContractState, game_id: u32) {
             let mut world = self.world_default();
             let game: GameState = world.read_model(game_id);
-            assert(game.phase == Phase::Day, 'E26');
+            assert(game.phase == Phase::Day, 'Day only');
+            assert(self.is_phase_time_valid(@game), 'Day expired');
 
             let mut target_to_kill = self.tally_votes(game_id, game.players.span());
+            let mut hunter_killed = false;
             if target_to_kill != starknet::contract_address_const::<0x0>() {
-                self.kill_player(game_id, target_to_kill, true);
+                let target_player: Player = world.read_model((game_id, target_to_kill));
+                if target_player.role == Role::Hunter {
+                    hunter_killed = true;
+                } else {
+                    self.kill_player(game_id, target_to_kill, true);
+                }
             }
 
             let updated_game: GameState = world.read_model(game_id);
@@ -311,6 +383,8 @@ pub mod actions {
                 game_id: game.game_id,
                 phase: if updated_game.werewolves_alive == 0 || updated_game.werewolves_alive >= updated_game.players_alive {
                     Phase::Ended
+                } else if hunter_killed {
+                    Phase::Day
                 } else {
                     Phase::Night
                 },
@@ -318,7 +392,7 @@ pub mod actions {
                 werewolves_alive: updated_game.werewolves_alive,
                 day_count: game.day_count,
                 phase_start_timestamp: starknet::get_block_timestamp(),
-                day_duration: game.day_duration,
+                day_duration: if hunter_killed { 30 } else { 120 },
                 night_action_duration: game.night_action_duration,
                 players: game.players.clone(),
             };
@@ -345,44 +419,49 @@ pub mod actions {
         fn kill_player(ref self: ContractState, game_id: u32, target: ContractAddress, from_voting: bool) {
             let mut world = self.world_default();
             let mut target_player: Player = world.read_model((game_id, target));
-            assert(target_player.is_alive, 'E27');
+            assert(target_player.is_alive, 'Target dead');
             if !from_voting {
-                assert(!target_player.is_protected, 'E28');
+                assert(!target_player.is_protected, 'Target protected');
             }
 
             let mut game: GameState = world.read_model(game_id);
+            let was_night = game.phase == Phase::Night;
+
             if target_player.role == Role::Hunter {
-                if !from_voting && game.phase == Phase::Night {
+                if from_voting && game.phase == Phase::Day {
+                    game.day_duration = 30;
+                    game.phase_start_timestamp = starknet::get_block_timestamp();
+                } else if was_night && !from_voting {
                     game.phase = Phase::Day;
                     game.day_count += 1;
                     game.phase_start_timestamp = starknet::get_block_timestamp();
-                    world.write_model(@game);
+                    game.day_duration = 30;
                 }
-                else if from_voting && game.phase == Phase::Day {
-                    game.phase_start_timestamp = starknet::get_block_timestamp();
-                    world.write_model(@game);
+            } else {
+                target_player.is_alive = false;
+                world.write_model(@target_player);
+                world.emit_event(@PlayerEliminated { game_id, player: target });
+                game.players_alive -= 1;
+
+                if let Option::Some(lover_addr) = target_player.lover_target {
+                    let mut lover: Player = world.read_model((game_id, lover_addr));
+                    if lover.is_alive {
+                        lover.is_alive = false;
+                        world.write_model(@lover);
+                        world.emit_event(@PlayerEliminated { game_id, player: lover_addr });
+                        game.players_alive -= 1;
+                    }
+                }
+
+                if target_player.role == Role::Werewolf {
+                    game.werewolves_alive -= 1;
                 }
             }
 
-            target_player.is_alive = false;
-            world.write_model(@target_player);
-            world.emit_event(@PlayerEliminated { game_id, player: target });
-
-            game.players_alive -= 1;
-
-            if let Option::Some(lover_addr) = target_player.lover_target {
-                let mut lover: Player = world.read_model((game_id, lover_addr));
-                if lover.is_alive {
-                    lover.is_alive = false;
-                    world.write_model(@lover);
-                    world.emit_event(@PlayerEliminated { game_id, player: lover_addr });
-                    game.players_alive -= 1;
-                }
+            if game.phase == Phase::Night && !from_voting && target_player.role != Role::Hunter {
+                game.phase_start_timestamp = starknet::get_block_timestamp();
             }
 
-            if target_player.role == Role::Werewolf {
-                game.werewolves_alive -= 1;
-            }
             world.write_model(@game);
         }
 

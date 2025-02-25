@@ -3,13 +3,13 @@ name = "Starkwolf"
 description = "A decentralized Werewolf game built with Dojo on Starknet. Players are assigned roles (Werewolf, Villager, etc.) and must strategize to win through voting and nighttime eliminations."
 cover_uri = "file://assets/cover.png"
 icon_uri = "file://assets/icon.png"
-website = "https://github.com/favsidv/starkwolf"
+website = "https://favsidv.github.io/starkwolf.github.io/"
 seed = "starkwolf"
 
 [world.socials]
 x = "https://x.com/starkwolf_game"
 discord = "https://discord.gg/starkwolf"
-github = "https://github.com/your-repo/starkwolf"
+github = "https://github.com/favsidv/starkwolf"
 telegram = "https://t.me/starkwolf"
 
 [namespace]
