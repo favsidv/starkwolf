@@ -25,7 +25,7 @@ pub struct WitchPotions {
 
 #[derive(Copy, Drop, Serde, Debug)]
 #[dojo::model]
-struct GuardProtection {
+pub struct GuardProtection {
     #[key]
     pub game_id: u32,
     pub last_protected: ContractAddress,

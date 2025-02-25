@@ -1313,7 +1313,7 @@
   "contracts": [
     {
       "address": "0x2f5c289133869e42ddf01b1c6dbf6b17d06f19ebf2105b118ac892cb3a1b8c9",
-      "class_hash": "0x7572d0b0d9c3a17ccebebc767544a70fc786565f3fefc3249d725125c99cbdd",
+      "class_hash": "0x2a0f92f115d60c843f4cc3ccee0254ce7d5e18e9a7e887fb8ebe38e940edcb0",
       "abi": [
         {
           "type": "impl",
@@ -1686,6 +1686,12 @@
     },
     {
       "members": [],
+      "class_hash": "0x276daf05370e103dad21906bf34544a9787bfc761bd23b7f0be92f0593e920a",
+      "tag": "starkwolf-GuardProtection",
+      "selector": "0x4f822847ac3ab9e73cd68f66d8e2761644c4b9d5faf9bdca077ad8ac925cfce"
+    },
+    {
+      "members": [],
       "class_hash": "0x7c58257b323e759e1e2779e5f59053afda53f7a8a8c1193f263f96bf023bd6e",
       "tag": "starkwolf-Player",
       "selector": "0x3bac779de26252758a9b91462346d2e941ea8e94dffd81d1fb3da044618b7b0"
@@ -1706,7 +1712,13 @@
   "events": [
     {
       "members": [],
-      "class_hash": "0x5c82544960387f6e58fa0df6c1edd11f1ad3762832bca297e01a928eda4cf72",
+      "class_hash": "0x5164ab31fd1bdc3e31556a390483dc905c3b70424c473b0ab825c1189ad10e7",
+      "tag": "starkwolf-GameEnded",
+      "selector": "0x5513046000a7a65fcec7b2933f7f6bdddd65f4897d18c6867e5c63e5022096d"
+    },
+    {
+      "members": [],
+      "class_hash": "0x64802b26a1af0c5e2f0b2490a6efe827db1669f1029f9440d357453815bb360",
       "tag": "starkwolf-GameStarted",
       "selector": "0x7837c505754c2c5738ec6f7dbc17487b15789c5efca2bdd18bd4060b825c864"
     },
@@ -1724,7 +1736,7 @@
     },
     {
       "members": [],
-      "class_hash": "0x3921e5015e1d68f79872af4760341336291937b340262a67c8ecd8c2b46f48b",
+      "class_hash": "0x61a606fd7960a32ea6778e21366742d9b1972fd4004270613052b919b81e37b",
       "tag": "starkwolf-PlayerEliminated",
       "selector": "0x7994bc2a1ad245838ff7171ce3f91b78faddd75940189b481d87aa610750040"
     }

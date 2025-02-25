@@ -1,4 +1,4 @@
-use starkwolf::models::{Player, Role, Phase, GameState, Vote, WitchPotions};
+use starkwolf::models::{Player, Role, Phase, GameState, Vote, WitchPotions, GuardProtection};
 use starknet::{ContractAddress};
 
 #[starknet::interface]
@@ -125,12 +125,12 @@ pub mod actions {
                 day_count: 0,
                 phase_start_timestamp: starknet::get_block_timestamp(),
                 day_duration: 120,
-                night_action_duration: 30,
+                night_action_duration: 60,
                 players: player_addresses,
             };
             world.write_model(@new_game);
 
-            world.emit_event(@GameStarted { game_id, player_count: player_count.try_into().unwrap() });
+            world.emit_event(@GameStarted { game_id, player_count: player_count.try_into().unwrap(), werewolf_count: werewolves });
         }
 
         fn vote(ref self: ContractState, game_id: u32, target: ContractAddress) {
@@ -235,10 +235,8 @@ pub mod actions {
             let mut hunter: Player = world.read_model((game_id, caller));
             assert(hunter.role == Role::Hunter, 'Not Hunter');
             
-            // Le chasseur doit être "actif" (tué récemment mais pas encore totalement mort)
-            // ou bien il doit avoir été tué pendant le vote du jour
             let current_time = self.get_current_timestamp();
-            assert(current_time <= game.phase_start_timestamp + 30, 'Hunter too late');
+            assert(current_time <= game.phase_start_timestamp + 60, 'Hunter too late');
         
             let target_player: Player = world.read_model((game_id, target));
             assert(target_player.is_alive, 'Target dead');
@@ -246,11 +244,9 @@ pub mod actions {
             self.kill_player(game_id, target, false);
             world.emit_event(@HunterShot { game_id, hunter: caller, target });
         
-            // Marquer le chasseur comme complètement mort
             hunter.is_alive = false;
             world.write_model(@hunter);
             
-            // Vérifier si le jeu est terminé
             self.check_game_end(game_id);
         }
 
@@ -273,16 +269,13 @@ pub mod actions {
                 potions.has_death_potion = false;
                 world.write_model(@potions);
                 
-                // Si la cible est le chasseur, il aura une chance de tirer
                 let is_hunter = target_player.role == Role::Hunter;
                 
                 self.kill_player(game_id, target, false);
                 
-                // Si un chasseur a été tué, marquer qu'il a une opportunité de tirer
                 if is_hunter {
                     let mut game: GameState = world.read_model(game_id);
-                    // Activer le "mode chasseur" pour la prochaine phase jour
-                    game.day_duration = 30; // Le chasseur aura 30 secondes
+                    game.day_duration = 60;
                     world.write_model(@game);
                 }
             } else if heal_potion && !target_player.is_alive && potions.has_life_potion {
@@ -291,7 +284,6 @@ pub mod actions {
                 target_player.is_alive = true;
                 world.write_model(@target_player);
                 
-                // Mettre à jour le compteur de joueurs vivants
                 let mut game: GameState = world.read_model(game_id);
                 game.players_alive += 1;
                 if target_player.role == Role::Werewolf {
@@ -306,7 +298,6 @@ pub mod actions {
             let mut game: GameState = world.read_model(game_id);
             assert(game.phase == Phase::Night, 'Night only');
 
-            // Réinitialiser les protections du garde
             let mut i = 0;
             loop {
                 if i >= game.players.len() {
@@ -318,16 +309,13 @@ pub mod actions {
                 i += 1;
             };
 
-            // Vérifier si le jeu est terminé après les actions de nuit
             self.check_game_end(game_id);
             
-            // Récupérer l'état du jeu potentiellement mis à jour
             game = world.read_model(game_id);
             if game.phase == Phase::Ended {
                 return;
             }
 
-            // Passer au jour
             game.phase = Phase::Day;
             game.day_count += 1;
             game.phase_start_timestamp = starknet::get_block_timestamp();
@@ -340,13 +328,12 @@ pub mod actions {
             let mut game: GameState = world.read_model(game_id);
             assert(game.phase == Phase::Day, 'Day only');
         
-            // Gérer le vote du jour
             let target_to_kill = self.tally_votes(game_id, game.players.span());
             if target_to_kill != starknet::contract_address_const::<0x0>() {
                 let target_player: Player = world.read_model((game_id, target_to_kill));
                 if target_player.role == Role::Hunter && target_player.is_alive {
                     // Phase spéciale pour le chasseur
-                    game.day_duration = 30;
+                    game.day_duration = 60;
                     game.phase_start_timestamp = starknet::get_block_timestamp();
                     world.write_model(@game);
                     return; // Ne termine pas encore le vote, attend hunter_action ou timeout
@@ -355,7 +342,6 @@ pub mod actions {
                 }
             }
         
-            // Réinitialiser les votes
             let mut i = 0;
             loop {
                 if i >= game.players.len() {
@@ -371,7 +357,7 @@ pub mod actions {
         
             // Gérer le timeout du chasseur s'il n'a pas agi
             let current_time = self.get_current_timestamp();
-            if game.day_duration == 30 && current_time > game.phase_start_timestamp + 30 {
+            if game.day_duration == 60 && current_time > game.phase_start_timestamp + 60 {
                 let mut i = 0;
                 loop {
                     if i >= game.players.len() {
@@ -386,10 +372,8 @@ pub mod actions {
                 };
             }
             
-            // Vérifier si le jeu est terminé
             self.check_game_end(game_id);
             
-            // Récupérer l'état du jeu potentiellement mis à jour
             game = world.read_model(game_id);
             world.write_model(@game);
         }
@@ -399,19 +383,16 @@ pub mod actions {
             let mut game: GameState = world.read_model(game_id);
             assert(game.phase == Phase::Day, 'Day only');
 
-            // Vérifier si le jeu est terminé
             self.check_game_end(game_id);
             
-            // Récupérer l'état du jeu potentiellement mis à jour
             game = world.read_model(game_id);
             if game.phase == Phase::Ended {
                 return;
             }
 
-            // Passer à la nuit
             game.phase = Phase::Night;
             game.phase_start_timestamp = starknet::get_block_timestamp();
-            game.night_action_duration = 30;
+            game.night_action_duration = 60;
             world.write_model(@game);
         }
     }
@@ -478,14 +459,11 @@ pub mod actions {
             let mut world = self.world_default();
             let mut game: GameState = world.read_model(game_id);
             
-            // Vérifier les conditions de fin du jeu
             if game.werewolves_alive == 0 {
-                // Les villageois gagnent
                 game.phase = Phase::Ended;
                 world.write_model(@game);
                 world.emit_event(@GameEnded { game_id, winner: 'villagers' });
             } else if game.werewolves_alive >= (game.players_alive - game.werewolves_alive) {
-                // Les loups-garous gagnent
                 game.phase = Phase::Ended;
                 world.write_model(@game);
                 world.emit_event(@GameEnded { game_id, winner: 'werewolves' });
@@ -540,7 +518,6 @@ pub mod actions {
                 i += 1;
             };
 
-            // Vérifier s'il y a un gagnant clair ou une égalité
             let mut max_votes = 0;
             let mut max_count = 0;
             let mut target_to_kill = starknet::contract_address_const::<0x0>();
@@ -555,13 +532,12 @@ pub mod actions {
                     target_to_kill = *vote_targets[i];
                     max_count = 1;
                 } else if *vote_counts[i] == max_votes {
-                    max_count += 1; // Il y a égalité
+                    max_count += 1;
                 }
                 i += 1;
             };
             
-            // En cas d'égalité, personne n'est éliminé
-            if max_count > 1 {
+            if max_count > 1_u8 {
                 return starknet::contract_address_const::<0x0>();
             }
             
