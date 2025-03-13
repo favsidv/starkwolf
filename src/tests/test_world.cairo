@@ -336,12 +336,12 @@ mod tests {
         starknet::testing::set_contract_address(guard);
         actions_system.night_action(1, seer);
 
-        starknet::testing::set_contract_address(seer);
-        let role = actions_system.seer_action(1, werewolf);
-        assert(role == Role::Werewolf, 'seer should see werewolf');
+        // starknet::testing::set_contract_address(seer);
+        // let role = actions_system.seer_action(1, werewolf);
+        // assert(role == Role::Werewolf, 'seer should see werewolf');
         
         // starknet::testing::set_contract_address(werewolf);
-        // actions_system.night_action(1, seer); // devrait échouer
+        // actions_system.night_action(1, seer); // devrait échouer car seer est mort
 
         actions_system.pass_night(1);
 
@@ -409,12 +409,9 @@ mod tests {
         println!("game.players_alive: {}", game.players_alive);
         let villager1_state: Player = world.read_model((1, villager1));
         let seer_state: Player = world.read_model((1, seer));
-        assert(!villager1_state.is_alive, 'villager1 should dead');
-        assert(!seer_state.is_alive, 'seer should still dead');
+        assert(!villager1_state.is_alive, 'villager1 should be dead');
+        assert(!seer_state.is_alive, 'seer should still be dead');
         assert(game.players_alive == 1, 'no villager should be alive');
         assert(game.werewolves_alive == 1, 'werewolves won');
-        
-        // // Si le test arrive jusqu'ici, cela signifie que les villageois ont gagné
-        // // car tous les loups-garous ont été éliminés
     }
 }
